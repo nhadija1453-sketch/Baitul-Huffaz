@@ -3,32 +3,50 @@
 import React, { useState } from 'react';
 import { BookOpen, User, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState('');
+  const { login } = useAuth();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    // Mock login logic for testing
-    setTimeout(() => {
-      if (username === 'admin' && password === 'admin123') {
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    const result = await login(email, password);
+
+    if (result.success) {
+      // Redirect based on role
+      const userEmail = email.toLowerCase();
+      if (userEmail.includes('admin')) {
         router.push('/dashboard/admin');
-      } else if (username === 'musyrif' && password === 'musyrif123') {
+      } else if (userEmail.includes('musyrif')) {
         router.push('/dashboard/musyrif');
-      } else if (username === 'santri' && password === 'santri123') {
-        router.push('/dashboard/santri');
       } else {
-        setError('Username atau password salah. Coba: admin / admin123');
-        setIsLoading(false);
+        router.push('/dashboard/santri');
       }
-    }, 1000);
+    } else {
+      setError(result.error || 'Login gagal');
+      setIsLoading(false);
+    }
+  };
+
+  const fillDemoAccount = (type: 'admin' | 'musyrif' | 'santri') => {
+    const accounts = {
+      admin: { email: 'admin@baitulhuffaz.sch.id', password: 'admin123' },
+      musyrif: { email: 'musyrif@baitulhuffaz.sch.id', password: 'musyrif123' },
+      santris: { email: 'santri@baitulhuffaz.sch.id', password: 'santri123' },
+    };
+    setEmail(accounts[type].email);
+    setPassword(accounts[type].password);
   };
 
   return (
@@ -45,7 +63,7 @@ export default function LoginPage() {
           <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-tosca-600 shadow-lg shadow-tosca-200 mb-6 transform transition-transform hover:scale-105">
             <BookOpen className="h-12 w-12 text-white" />
           </div>
-          
+
           {/* App Name & Welcome Message */}
           <h1 className="text-3xl font-extrabold tracking-tight text-tosca-900 mb-1">
             Baitul Huffaz
@@ -64,24 +82,24 @@ export default function LoginPage() {
 
         <form className="mt-8 space-y-5" onSubmit={handleLogin}>
           <div className="space-y-4">
-            {/* Username Field */}
+            {/* Email Field */}
             <div className="relative group">
-              <label htmlFor="username" className="block text-sm font-semibold text-tosca-700 mb-1.5 ml-1">
-                Username
+              <label htmlFor="email" className="block text-sm font-semibold text-tosca-700 mb-1.5 ml-1">
+                Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-tosca-400 group-focus-within:text-tosca-600 transition-colors">
                   <User size={18} />
                 </div>
                 <input
-                  id="username"
-                  name="username"
-                  type="text"
+                  id="email"
+                  name="email"
+                  type="email"
                   required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="block w-full rounded-xl border-0 py-3.5 pl-11 pr-4 text-tosca-900 ring-1 ring-inset ring-tosca-200 placeholder:text-tosca-300 focus:ring-2 focus:ring-inset focus:ring-tosca-600 sm:text-sm sm:leading-6 bg-tosca-50/30 transition-all"
-                  placeholder="Masukkan username"
+                  placeholder="Masukkan email"
                 />
               </div>
             </div>
@@ -139,30 +157,30 @@ export default function LoginPage() {
           <p className="text-xs font-bold text-tosca-500 uppercase tracking-widest text-center mb-3">
             Template Akun Demo
           </p>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-3 gap-2.5">
             <button
               type="button"
-              onClick={() => {
-                setUsername('musyrif');
-                setPassword('musyrif123');
-              }}
+              onClick={() => fillDemoAccount('admin')}
               className="flex flex-col items-center justify-center p-2.5 bg-tosca-50/50 hover:bg-tosca-100/70 border border-tosca-100 rounded-xl transition-all group text-left"
             >
-              <span className="text-[10px] font-black text-tosca-700 uppercase">Musyrif/ah</span>
-              <span className="text-[11px] font-bold text-tosca-900 mt-0.5">musyrif</span>
-              <span className="text-[9px] text-tosca-400 font-medium">PW: musyrif123</span>
+              <span className="text-[10px] font-black text-tosca-700 uppercase">Admin</span>
+              <span className="text-[11px] font-bold text-tosca-900 mt-0.5">admin</span>
             </button>
             <button
               type="button"
-              onClick={() => {
-                setUsername('admin');
-                setPassword('admin123');
-              }}
+              onClick={() => fillDemoAccount('musyrif')}
               className="flex flex-col items-center justify-center p-2.5 bg-tosca-50/50 hover:bg-tosca-100/70 border border-tosca-100 rounded-xl transition-all group text-left"
             >
-              <span className="text-[10px] font-black text-tosca-700 uppercase">Admin Utama</span>
-              <span className="text-[11px] font-bold text-tosca-900 mt-0.5">admin</span>
-              <span className="text-[9px] text-tosca-400 font-medium">PW: admin123</span>
+              <span className="text-[10px] font-black text-tosca-700 uppercase">Musyrif</span>
+              <span className="text-[11px] font-bold text-tosca-900 mt-0.5">musyrif</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => fillDemoAccount('santri')}
+              className="flex flex-col items-center justify-center p-2.5 bg-tosca-50/50 hover:bg-tosca-100/70 border border-tosca-100 rounded-xl transition-all group text-left"
+            >
+              <span className="text-[10px] font-black text-tosca-700 uppercase">Santri</span>
+              <span className="text-[11px] font-bold text-tosca-900 mt-0.5">santri</span>
             </button>
           </div>
         </div>

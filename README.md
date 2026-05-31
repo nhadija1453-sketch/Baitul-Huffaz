@@ -7,10 +7,9 @@ Sistem Manajemen Lembaga Tahfizh Al-Qur'an Baitul Huffaz
 - **Framework:** Next.js 14 (App Router)
 - **Bahasa:** TypeScript
 - **Styling:** Tailwind CSS
-- **Database:** Supabase (PostgreSQL)
-- **Authentication:** Supabase Auth
+- **Database:** PostgreSQL (Neon / Vercel Postgres)
 - **Hosting:** Vercel
-- **Storage:** Neon (PostgreSQL Serverless)
+- **Storage:** Vercel Blob / Neon
 
 ## Fitur
 
@@ -19,7 +18,7 @@ Sistem Manajemen Lembaga Tahfizh Al-Qur'an Baitul Huffaz
 - Manajemen Musyrif/Ustadz
 - Manajemen Kelas/Halaqah
 - Manajemen Jadwal
-- Input& Review Nilai Hafalan
+- Input & Review Nilai Hafalan
 - Generate Raport
 - Generate Sertifikat
 
@@ -51,7 +50,7 @@ npm install
 # Copy environment file
 cp .env.example .env.local
 
-# Edit .env.local dengan credentials Supabase Anda
+# Edit .env.local dengan connection string Neon/Vercel Anda
 
 # Run development server
 npm run dev
@@ -59,101 +58,26 @@ npm run dev
 
 Buka [http://localhost:3000](http://localhost:3000)
 
-## Setup Supabase
+## Setup Database (Neon)
 
-1. Buat project baru di [Supabase](https://supabase.com)
-2. Dapatkan URL dan ANON KEY dari Settings > API
-3. Jalankan SQL migrations di `database/migrations/`
-4. Update `.env.local` dengan credentials Anda
+1. Buat project baru di [Neon](https://neon.tech) atau gunakan Vercel Postgres
+2. Dapatkan connection string dari dashboard
+3. Set environment variable `DATABASE_URL` di `.env.local`
+4. Jalankan SQL migrations di `database/migrations/001_schema.sql`
+
+Atau di Vercel:
+1. Buka project di Vercel Dashboard
+2. Go to Storage > Create Database
+3. Pilih Neon atau Vercel Postgres
+4. Copy connection string ke Environment Variables
 
 ## Setup Database Schema
 
+Jalankan SQL berikut di Neon SQL Editor atau psql:
+
 ```sql
--- Jalankan di Supabase SQL Editor
-
--- Users table (sudah ada)
-CREATE TABLE public.users (
-  id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  full_name TEXT NOT NULL,
-  role TEXT DEFAULT 'SANTRI' CHECK (role IN ('ADMIN', 'MUSYRIF', 'SANTRI')),
-  avatar_url TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- Kelas table
-CREATE TABLE public.kelas (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  nama VARCHAR(100) NOT NULL,
-  musyrif_id UUID REFERENCES public.users(id),
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Setoran table
-CREATE TABLE public.setoran (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  santuario_id UUID REFERENCES public.users(id),
-  musyrif_id UUID REFERENCES public.users(id),
-  surah VARCHAR(100) NOT NULL,
-  ayat_start INT,
-  ayat_end INT,
-  tajwid_score INT,
-  makhraj_score INT,
-  kelancaran_score INT,
-  rata_rata INT,
-  status VARCHAR(20) CHECK (status IN ('LANJUT', 'ULANGI')),
-  catatan TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Jadwal table
-CREATE TABLE public.jadwal (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sesi VARCHAR(100) NOT NULL,
-  jam_mulai TIME,
-  jam_selesai TIME,
-  lokasi VARCHAR(200),
-  musyrif_id UUID REFERENCES public.users(id),
-  hari VARCHAR(20),
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Absensi table
-CREATE TABLE public.absensi (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  santuario_id UUID REFERENCES public.users(id),
-  tanggal DATE NOT NULL,
-  status VARCHAR(20) CHECK (status IN ('HADIR', 'IZIN', 'SAKIT', 'ALPA')),
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Evaluasi table
-CREATE TABLE public.evaluasi (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  santuario_id UUID REFERENCES public.users(id),
-  musyrif_id UUID REFERENCES public.users(id),
-  predikat_adab VARCHAR(50),
-  catatan TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Target Hafalan table
-CREATE TABLE public.target_hafalan (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  santuario_id UUID REFERENCES public.users(id),
-  juz_target INT,
-  progres INT DEFAULT 0,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Sertifikat table
-CREATE TABLE public.sertifikat (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  santuario_id UUID REFERENCES public.users(id),
-  juz INT NOT NULL,
-  tgl_cetak DATE,
-  created_at TIMESTAMP DEFAULT NOW()
-);
+-- Lihat file database/migrations/001_schema.sql untuk schema lengkap
+-- Atau jalankan: cat database/migrations/001_schema.sql | psql $DATABASE_URL
 ```
 
 ## Deploy ke Vercel
@@ -161,20 +85,38 @@ CREATE TABLE public.sertifikat (
 1. Push kode ke GitHub repository
 2. Buka [vercel.com](https://vercel.com)
 3. Import repository GitHub
-4. Set environment variables:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-5. Deploy!
+4. Setup Storage (Neon Postgres atau Vercel Postgres)
+5. Set environment variable `DATABASE_URL`
+6. Deploy!
+
+### Environment Variables untuk Vercel
+
+```env
+DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
+```
 
 ## Akun Demo
 
-Untuk testing tanpa database:
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@baitulhuffaz.sch.id | admin123 |
+| Musyrif | musyrif@baitulhuffaz.sch.id | musyrif123 |
+| Santri | santri@baitulhuffaz.sch.id | santri123 |
 
-| Role | Username | Password |
-|------|----------|----------|
-| Admin | admin | admin123 |
-| Musyrif | musyrif | musyrif123 |
-| Santri | santri | santai123 |
+## Struktur Database
+
+```
+users          - Data user (admin, musyrif, santri)
+kelas          - Data kelas/halaqah
+setoran        - Record setoran hafalan
+jadwal         - Jadwal kegiatan
+absensi        - Kehadiran harian
+evaluasi       - Evaluasi sikap/adab
+target_hafalan - Target hafalan per santri
+sertifikat     - Data sertifikat
+raport         - Raport hafalan
+zoom_meetings  - Data meeting zoom
+```
 
 ## License
 
