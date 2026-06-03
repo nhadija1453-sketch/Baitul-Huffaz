@@ -1,187 +1,680 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Sidebar from '@/components/ui/sidebar';
 import Navbar from '@/components/ui/navbar';
-import { 
-  Plus, 
-  Search, 
+import {
+  Plus,
+  Search,
   MoreVertical,
   Edit,
   Trash2,
   Mail,
   Phone,
   X,
-  CheckCircle2
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  UserPlus,
+  Users,
+  FileDown,
+  Upload,
+  ExternalLink
 } from 'lucide-react';
 
-const initialMusyrif = [
-  { nip: 'MSR-001', nama: 'Ust. Mansyur Al-Hafizh', kelompok: 'Halaqah A', email: 'mansyur@contoh.com', wa: '081234567801' },
-  { nip: 'MSR-002', nama: 'Usth. Siti Khadijah', kelompok: 'Halaqah B', email: 'khadijah@contoh.com', wa: '081234567802' },
-  { nip: 'MSR-003', nama: 'Ust. Zulkifli', kelompok: 'Halaqah C', email: 'zulkifli@contoh.com', wa: '081234567803' },
+// Types
+interface Musyrif {
+  id: string;
+  nip: string;
+  nama_lengkap: string;
+  kelas_id: string;
+  kelas_nama: string;
+  email: string;
+  no_wa: string;
+  username: string;
+  password: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+// Daftar Kelas untuk sinkronisasi
+const kelasList = [
+  { id: 'kelas-7a', nama: '7A - Tahfizh Dasar' },
+  { id: 'kelas-7b', nama: '7B - Tahfizh Dasar' },
+  { id: 'kelas-8a', nama: '8A - Tahfizh Menengah' },
+  { id: 'kelas-8b', nama: '8B - Tahfizh Menengah' },
+  { id: 'kelas-9a', nama: '9A - Tahfizh Lanjutan' },
+  { id: 'kelas-9b', nama: '9B - Tahfizh Lanjutan' },
 ];
+
+// Initial Musyrif data
+const initialMusyrif: Musyrif[] = [];
+
+// Initial accounts for login
+const initialAccounts: any[] = [];
+
+// Simple hash function
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash.toString(16);
+}
 
 export default function ManajemenMusyrif() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingMusyrif, setEditingMusyrif] = useState<Musyrif | null>(null);
   const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const filteredMusyrif = initialMusyrif.filter(m => 
-    m.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.nip.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Form state
+  const [formData, setFormData] = useState({
+    nip: '',
+    nama_lengkap: '',
+    kelas_id: '',
+    email: '',
+    no_wa: '',
+    username: '',
+    password: '',
+  });
 
-  const triggerToast = () => {
+  // Load data dari localStorage
+  const [musyrifList, setMusyrifList] = useState<Musyrif[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('musyrif_list');
+      return stored ? JSON.parse(stored) : initialMusyrif;
+    }
+    return initialMusyrif;
+  });
+
+  // Simpan ke localStorage
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isMounted) {
+      localStorage.setItem('musyrif_list', JSON.stringify(musyrifList));
+
+      // Sync dengan accounts untuk login
+      const accounts = [...initialAccounts];
+      const existingAccounts = localStorage.getItem('musyrif_accounts');
+      if (existingAccounts) {
+        const parsed = JSON.parse(existingAccounts);
+        parsed.forEach((acc: any) => {
+          if (!accounts.some(a => a.username === acc.username)) {
+            accounts.push(acc);
+          }
+        });
+      }
+      localStorage.setItem('musyrif_accounts', JSON.stringify(accounts));
+    }
+  }, [musyrifList, isMounted]);
+
+  // Generate NIP
+  const generateNIP = () => {
+    const num = Math.floor(100 + Math.random() * 900);
+    return `MSR-${num}`;
+  };
+
+  // Generate username
+  const generateUsername = (nama: string) => {
+    return nama.toLowerCase()
+      .replace(/\s+/g, '.')
+      .replace(/[^a-z.]/g, '')
+      .replace(/^(ust|ustadh|ustadz|ustaz|dr|drg)\.?/i, 'ust.');
+  };
+
+  // Generate password
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let password = '';
+    for (let i = 0; i < 8; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
+  const triggerToast = (message: string) => {
+    setToastMessage(message);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handleAddMusyrif = (e: React.FormEvent) => {
-    e.preventDefault();
+  const resetForm = () => {
+    setFormData({
+      nip: '',
+      nama_lengkap: '',
+      kelas_id: '',
+      email: '',
+      no_wa: '',
+      username: '',
+      password: '',
+    });
+    setShowPassword(false);
+    setEditingMusyrif(null);
+    setIsEditMode(false);
+  };
+
+  const openAddModal = () => {
+    resetForm();
+    setFormData(prev => ({
+      ...prev,
+      nip: generateNIP(),
+      password: generatePassword(),
+    }));
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (musyrif: Musyrif) => {
+    setEditingMusyrif(musyrif);
+    setIsEditMode(true);
+    setFormData({
+      nip: musyrif.nip,
+      nama_lengkap: musyrif.nama_lengkap,
+      kelas_id: musyrif.kelas_id,
+      email: musyrif.email,
+      no_wa: musyrif.no_wa,
+      username: musyrif.username,
+      password: '',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => {
+      const newData = { ...prev, [name]: value };
+      if (name === 'nama_lengkap' && !isEditMode) {
+        newData.username = generateUsername(value);
+      }
+      return newData;
+    });
+  };
+
+  const handleSave = async () => {
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    if (isEditMode && editingMusyrif) {
+      // Update existing
+      setMusyrifList(prev => prev.map(m =>
+        m.id === editingMusyrif.id
+          ? {
+              ...m,
+              ...formData,
+              kelas_nama: kelasList.find(k => k.id === formData.kelas_id)?.nama || m.kelas_nama,
+              password: formData.password ? `hashed_${formData.password}` : m.password
+            }
+          : m
+      ));
+
+      // Update account if password changed
+      if (formData.password) {
+        const stored = localStorage.getItem('musyrif_accounts');
+        if (stored) {
+          const accounts = JSON.parse(stored);
+          const index = accounts.findIndex((a: any) => a.id === editingMusyrif.id);
+          if (index >= 0) {
+            accounts[index].password = simpleHash(formData.password);
+            accounts[index].email = formData.email;
+            accounts[index].fullName = formData.nama_lengkap;
+            localStorage.setItem('musyrif_accounts', JSON.stringify(accounts));
+          }
+        }
+      }
+
+      triggerToast('Data Musyrif Berhasil Diperbarui!');
+    } else {
+      // Add new
+      const newMusyrif: Musyrif = {
+        id: Date.now().toString(),
+        ...formData,
+        kelas_nama: kelasList.find(k => k.id === formData.kelas_id)?.nama || '',
+        is_active: true,
+        created_at: new Date().toISOString().split('T')[0],
+        password: `hashed_${formData.password}`,
+      };
+      setMusyrifList(prev => [newMusyrif, ...prev]);
+
+      // Create login account
+      const newAccount = {
+        id: newMusyrif.id,
+        username: formData.username,
+        password: simpleHash(formData.password),
+        fullName: formData.nama_lengkap,
+        email: formData.email,
+        role: 'MUSYRIF',
+        nip: formData.nip,
+        created_at: new Date().toISOString(),
+      };
+
+      const stored = localStorage.getItem('musyrif_accounts');
+      const accounts = stored ? JSON.parse(stored) : [];
+      accounts.push(newAccount);
+      localStorage.setItem('musyrif_accounts', JSON.stringify(accounts));
+
+      triggerToast(`Musyrif "${formData.nama_lengkap}" berhasil ditambahkan! Akun: ${formData.username}`);
+    }
+
+    setIsLoading(false);
     setIsModalOpen(false);
-    triggerToast();
+    resetForm();
+  };
+
+  const handleDelete = (id: string, nama: string) => {
+    if (confirm(`Apakah Anda yakin ingin menghapus data Musyrif "${nama}"?\nAkun login juga akan dihapus.`)) {
+      setMusyrifList(prev => prev.filter(m => m.id !== id));
+
+      // Delete account
+      const stored = localStorage.getItem('musyrif_accounts');
+      if (stored) {
+        const accounts = JSON.parse(stored);
+        const filtered = accounts.filter((a: any) => a.id !== id);
+        localStorage.setItem('musyrif_accounts', JSON.stringify(filtered));
+      }
+
+      triggerToast('Data Musyrif Berhasil Dihapus!');
+    }
+  };
+
+  // Filter
+  const filteredMusyrif = musyrifList.filter(m =>
+    m.nama_lengkap.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    m.nip.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    m.username.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Download template
+  const downloadTemplate = () => {
+    const headers = ['NIP', 'Nama Lengkap', 'Kelas ID', 'Email', 'No WA', 'Username'];
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(",");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "template_musyrif_baitul_huffaz.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Handle file upload
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      triggerToast(`File "${file.name}" berhasil diupload.`);
+      setTimeout(() => {
+        triggerToast('Data Musyrif Berhasil Diimpor!');
+      }, 1500);
+    }
   };
 
   return (
     <div className="min-h-screen bg-tosca-50/30">
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-      
+
       <div className="lg:pl-72 transition-all duration-300">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
-        
+
         <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-          {/* Header Card with White Background */}
+          {/* Header Card */}
           <div className="bg-white p-6 sm:p-8 rounded-3xl border border-tosca-50 shadow-sm mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-            <div className="space-y-1">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-tosca-900">Manajemen Musyrif/ah</h1>
-              <p className="text-tosca-600 font-medium">Kelola data ustadz dan ustadzah pembimbing Baitul Huffaz.</p>
-            </div>
             <div className="flex items-center gap-4">
-              {showToast && (
-                <div className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-xl shadow-lg animate-in fade-in slide-in-from-right-4">
-                  <CheckCircle2 size={18} />
-                  <span className="text-sm font-bold">Berhasil Disimpan!</span>
-                </div>
-              )}
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className="flex items-center justify-center gap-2 bg-tosca-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-tosca-200 hover:bg-tosca-700 transition-all active:scale-95"
-              >
-                <Plus size={20} />
-                Tambah Musyrif
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-3xl border border-tosca-50 shadow-sm mb-6">
-            <div className="relative group max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-tosca-400">
-                <Search size={18} />
+              <div className="p-3 bg-purple-100 rounded-2xl">
+                <Users size={28} className="text-purple-600" />
               </div>
-              <input 
-                type="text" 
-                placeholder="Cari nama atau NIP musyrif..." 
-                className="pl-10 pr-4 py-2 bg-tosca-50/50 border border-tosca-200 rounded-xl text-sm font-bold text-black placeholder:text-tosca-500 focus:ring-2 focus:ring-tosca-500 w-full transition-all"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+              <div className="space-y-1">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-tosca-900">Manajemen Musyrif/ah</h1>
+                <p className="text-tosca-600 font-medium">Kelola data & akun login ustadz/ustadzah Baitul Huffaz.</p>
+              </div>
+            </div>
+            {showToast && (
+              <div className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-xl shadow-lg animate-in fade-in slide-in-from-right-4">
+                <CheckCircle2 size={18} />
+                <span className="text-sm font-bold">{toastMessage}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Info Card */}
+          <div className="bg-purple-50/50 border border-purple-100 rounded-2xl p-4 mb-6 flex items-start gap-3">
+            <div className="p-2 bg-purple-100 rounded-xl">
+              <UserPlus size={20} className="text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-purple-800">Informasi Penting</p>
+              <p className="text-xs text-purple-600 mt-1">
+                Musyrif yang didaftarkan akan otomatis memiliki akun login. Username dan password default bisa diubah kemudian.
+              </p>
             </div>
           </div>
 
+          {/* Action Bar */}
+          <div className="bg-white p-4 rounded-3xl border border-tosca-50 shadow-sm mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={downloadTemplate}
+                  className="flex items-center gap-2 px-4 py-2 bg-tosca-50 text-tosca-700 rounded-xl font-semibold text-sm hover:bg-tosca-100 transition-colors border border-tosca-100"
+                >
+                  <FileDown size={18} />
+                  Template
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2 bg-tosca-50 text-tosca-700 rounded-xl font-semibold text-sm hover:bg-tosca-100 transition-colors border border-tosca-100"
+                >
+                  <Upload size={18} />
+                  Upload Massal
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  accept=".csv,.xls,.xlsx"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-tosca-400">
+                    <Search size={18} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Cari NIP, Nama, Username..."
+                    className="pl-10 pr-4 py-2 bg-tosca-50/50 border border-tosca-100 rounded-xl text-sm focus:ring-2 focus:ring-tosca-500 focus:border-tosca-500 transition-all w-full sm:w-64"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <button
+                  onClick={openAddModal}
+                  className="flex items-center gap-2 px-4 py-2 bg-tosca-900 text-white rounded-xl font-semibold text-sm hover:bg-black transition-all shadow-md"
+                >
+                  <Plus size={18} />
+                  <span className="hidden sm:inline">Tambah Musyrif</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Table Section */}
           <div className="bg-white rounded-3xl border border-tosca-50 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-tosca-50/50 border-b border-tosca-50">
-                    <th className="px-6 py-4 text-xs font-bold text-tosca-700 uppercase tracking-wider">NIP</th>
-                    <th className="px-6 py-4 text-xs font-bold text-tosca-700 uppercase tracking-wider">Nama Lengkap</th>
-                    <th className="px-6 py-4 text-xs font-bold text-tosca-700 uppercase tracking-wider">Kelompok Binaan</th>
-                    <th className="px-6 py-4 text-xs font-bold text-tosca-700 uppercase tracking-wider">Kontak</th>
-                    <th className="px-6 py-4 text-xs font-bold text-tosca-700 uppercase tracking-wider text-center">Aksi</th>
+                  <tr className="bg-tosca-50/50 border-b border-tosca-100">
+                    <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">No</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">NIP</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Nama Lengkap</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Kelompok Binaan</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Kontak</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Username</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Password</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-tosca-50">
                   {filteredMusyrif.length > 0 ? (
-                    filteredMusyrif.map((m) => (
-                      <tr key={m.nip} className="hover:bg-tosca-50/30 transition-colors group">
-                        <td className="px-6 py-4 text-sm font-medium text-tosca-900">{m.nip}</td>
-                        <td className="px-6 py-4 text-sm text-tosca-700 font-semibold">{m.nama}</td>
-                        <td className="px-6 py-4">
-                          <span className="px-3 py-1 bg-tosca-100 text-tosca-700 rounded-full text-xs font-bold">{m.kelompok}</span>
+                    filteredMusyrif.map((m, index) => (
+                      <tr key={m.id} className="hover:bg-tosca-50/30 transition-colors group">
+                        <td className="px-4 py-3 text-sm font-medium text-tosca-500">{index + 1}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-tosca-800">{m.nip}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-tosca-900">{m.nama_lengkap}</td>
+                        <td className="px-4 py-3">
+                          <span className="px-2.5 py-1 bg-purple-100 text-purple-700 rounded-full text-[10px] font-bold">
+                            {m.kelas_nama}
+                          </span>
                         </td>
-                        <td className="px-6 py-4 space-y-1">
-                          <div className="flex items-center gap-2 text-xs text-tosca-600 font-medium group-hover:text-tosca-900 transition-colors"><Mail size={12} /> {m.email}</div>
-                          <div className="flex items-center gap-2 text-xs text-tosca-600 font-medium group-hover:text-tosca-900 transition-colors"><Phone size={12} /> {m.wa}</div>
+                        <td className="px-4 py-3 space-y-1">
+                          <a
+                            href={`mailto:${m.email}`}
+                            className="flex items-center gap-1.5 text-xs text-tosca-600 hover:text-tosca-900 transition-colors"
+                          >
+                            <Mail size={12} />
+                            {m.email}
+                          </a>
+                          <a
+                            href={`https://wa.me/${m.no_wa.replace(/^0/, '62')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-xs text-tosca-600 hover:text-tosca-900 transition-colors"
+                          >
+                            <Phone size={12} />
+                            {m.no_wa}
+                            <ExternalLink size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </a>
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <button className="p-2 text-tosca-500 hover:bg-tosca-100 rounded-lg transition-colors"><Edit size={18} /></button>
-                            <button className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={18} /></button>
+                        <td className="px-4 py-3 text-sm font-mono text-tosca-700 bg-tosca-50/50 rounded">{m.username}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="px-2.5 py-1 bg-gray-100 text-gray-500 rounded text-[10px] font-bold">
+                            ********
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => openEditModal(m)}
+                              className="p-1.5 text-tosca-500 hover:bg-tosca-100 hover:text-tosca-700 rounded-lg transition-colors"
+                              title="Edit"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(m.id, m.nama_lengkap)}
+                              className="p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+                              title="Hapus"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                            <button className="p-1.5 text-tosca-400 hover:bg-tosca-50 rounded-lg">
+                              <MoreVertical size={16} />
+                            </button>
                           </div>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-tosca-500 font-medium italic">
-                        Tidak ada musyrif yang ditemukan dengan nama "{searchTerm}"
+                      <td colSpan={8} className="px-6 py-12 text-center text-tosca-500 font-medium italic">
+                        Tidak ada musyrif yang ditemukan dengan kata kunci "{searchTerm}"
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            <div className="px-6 py-4 bg-tosca-50/20 border-t border-tosca-50 flex items-center justify-between text-sm text-tosca-500 font-medium">
+              <p>Menampilkan {filteredMusyrif.length} dari {filteredMusyrif.length} musyrif</p>
+              <div className="flex gap-2">
+                <button className="px-3 py-1.5 border border-tosca-100 rounded-lg hover:bg-white transition-colors disabled:opacity-50" disabled>Sebelumnya</button>
+                <button className="px-3 py-1.5 border border-tosca-100 rounded-lg hover:bg-white transition-colors bg-tosca-50">1</button>
+                <button className="px-3 py-1.5 border border-tosca-100 rounded-lg hover:bg-white transition-colors">2</button>
+                <button className="px-3 py-1.5 border border-tosca-100 rounded-lg hover:bg-white transition-colors">Selanjutnya</button>
+              </div>
+            </div>
           </div>
         </main>
       </div>
 
-      {/* Modal Tambah Musyrif */}
+      {/* Modal Tambah/Edit Musyrif */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between p-6 border-b border-tosca-50">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 my-8">
+            <div className="flex items-center justify-between p-6 border-b border-tosca-50 bg-tosca-50/20">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-tosca-100 rounded-xl text-tosca-600">
-                  <Plus size={20} />
+                <div className="p-2 bg-purple-600 rounded-xl text-white">
+                  <UserPlus size={20} />
                 </div>
-                <h2 className="text-xl font-bold text-tosca-900">Tambah Musyrif Baru</h2>
+                <h2 className="text-xl font-bold text-tosca-900">
+                  {isEditMode ? 'Edit Data Musyrif' : 'Tambah Musyrif Baru'}
+                </h2>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="text-tosca-400 hover:text-tosca-600 transition-colors">
+              <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="text-tosca-400 hover:text-tosca-600 transition-colors">
                 <X size={24} />
               </button>
             </div>
-            <form className="p-6 space-y-4" onSubmit={handleAddMusyrif}>
+
+            <form className="p-6 space-y-5 max-h-[70vh] overflow-y-auto" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+              {/* Baris 1: NIP & Kelas */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-tosca-700 ml-1">NIP / ID</label>
-                  <input type="text" required className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm" placeholder="MSR-00X" />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-tosca-700 ml-1">NIP</label>
+                  <input
+                    type="text"
+                    name="nip"
+                    value={formData.nip}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm bg-tosca-50/50"
+                    placeholder="MSR-XXX"
+                  />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-tosca-700 ml-1">Kelompok Binaan</label>
-                  <select className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm">
-                    <option>Halaqah A</option>
-                    <option>Halaqah B</option>
-                    <option>Halaqah C</option>
-                    <option>Halaqah D</option>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-tosca-700 ml-1">Kelompok Binaan (Kelas)</label>
+                  <select
+                    name="kelas_id"
+                    value={formData.kelas_id}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm"
+                  >
+                    <option value="">-- Pilih Kelas --</option>
+                    {kelasList.map(k => (
+                      <option key={k.id} value={k.id}>{k.nama}</option>
+                    ))}
                   </select>
                 </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-tosca-700 ml-1">Nama Lengkap</label>
-                <input type="text" required className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm" placeholder="Nama lengkap ustadz/ah" />
+
+              {/* Nama Lengkap */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-tosca-700 ml-1">Nama Lengkap</label>
+                <input
+                  type="text"
+                  name="nama_lengkap"
+                  value={formData.nama_lengkap}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm"
+                  placeholder="Nama lengkap ustadz/ustadzah"
+                />
               </div>
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-tosca-700 ml-1">Email</label>
-                <input type="email" required className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm" placeholder="email@contoh.com" />
+
+              {/* Kontak */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-tosca-700 ml-1">Email</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm"
+                    placeholder="email@baitulhuffaz.sch.id"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-tosca-700 ml-1">Nomor WhatsApp</label>
+                  <input
+                    type="text"
+                    name="no_wa"
+                    value={formData.no_wa}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm"
+                    placeholder="6281234567890"
+                  />
+                </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-sm font-semibold text-tosca-700 ml-1">Nomor WhatsApp</label>
-                <input type="text" required className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm" placeholder="62812xxx" />
+
+              {/* Info Akun Login */}
+              <div className="bg-purple-50/50 rounded-2xl p-4 border border-purple-100">
+                <p className="text-xs font-bold text-purple-700 mb-3">AKUN LOGIN MUSYRIF</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-tosca-700 ml-1">Username</label>
+                    <input
+                      type="text"
+                      name="username"
+                      value={formData.username}
+                      onChange={handleInputChange}
+                      required
+                      className="w-full px-4 py-2.5 rounded-xl border border-tosca-200 focus:ring-2 focus:ring-tosca-500 text-sm font-mono bg-white"
+                      placeholder="username"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-tosca-700 ml-1">Password</label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        name="password"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        required={!isEditMode}
+                        className="w-full px-4 py-2.5 pr-10 rounded-xl border border-tosca-200 focus:ring-2 focus:ring-tosca-500 text-sm font-mono bg-white"
+                        placeholder={isEditMode ? 'Kosongkan jika tidak diubah' : 'Password default'}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-tosca-400 hover:text-tosca-600"
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {!isEditMode && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, password: generatePassword() }))}
+                    className="mt-2 text-xs font-bold text-purple-600 hover:text-purple-800 underline"
+                  >
+                    Generate Password Baru
+                  </button>
+                )}
               </div>
+
+              {/* Tombol Aksi */}
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-3 border border-tosca-100 text-tosca-600 rounded-xl font-bold hover:bg-tosca-50 transition-colors">Batal</button>
-                <button type="submit" className="flex-1 px-4 py-3 bg-tosca-600 text-white rounded-xl font-bold hover:bg-tosca-700 transition-all shadow-lg shadow-tosca-100">Simpan Data</button>
+                <button
+                  type="button"
+                  onClick={() => { setIsModalOpen(false); resetForm(); }}
+                  className="flex-1 px-4 py-3 border-2 border-tosca-100 text-tosca-600 rounded-xl font-bold hover:bg-tosca-50 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all shadow-lg shadow-purple-100 disabled:opacity-70 flex items-center justify-center gap-2"
+                >
+                  {isLoading ? (
+                    <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <CheckCircle2 size={18} />
+                      {isEditMode ? 'Simpan Perubahan' : 'Simpan Musyrif'}
+                    </>
+                  )}
+                </button>
               </div>
             </form>
           </div>

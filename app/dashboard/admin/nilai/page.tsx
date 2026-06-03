@@ -15,17 +15,32 @@ import {
   X
 } from 'lucide-react';
 
-const nilaiSantri = [
-  { id: 1, nama: 'Ahmad Fauzi', juz: '28', surat: 'Al-Mujadilah', nilai: '85', status: 'Lancar' },
-  { id: 2, nama: 'Siti Aminah', juz: '5', surat: 'An-Nisa', nilai: '92', status: 'Mumtaz' },
-  { id: 3, nama: 'Zaid Al-Khair', juz: '30', surat: 'An-Naba', nilai: '78', status: 'Murojaah' },
-];
-
 export default function ManajemenNilai() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeModal, setActiveModal] = useState<'filter' | 'analysis' | 'detail' | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [nilaiList, setNilaiList] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    const stored = localStorage.getItem('baitul_hafalan_records');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        const mapped = parsed.map((r: any) => ({
+          id: r.id,
+          nama: r.santriName,
+          juz: r.surah.includes('Juz') ? r.surah.replace(/Juz\s+/i, '') : '30', // extract or fallback
+          surat: r.surah,
+          nilai: r.rata.toFixed(0),
+          status: r.rata >= 90 ? 'Mumtaz' : r.rata >= 80 ? 'Lancar' : 'Murojaah'
+        }));
+        setNilaiList(mapped);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
 
   const openDetail = (student: any) => {
     setSelectedStudent(student);
@@ -81,7 +96,11 @@ export default function ManajemenNilai() {
             </div>
             
             <div className="divide-y divide-tosca-50">
-              {nilaiSantri.filter(n => n.nama.toLowerCase().includes(searchTerm.toLowerCase())).map((n) => (
+              {nilaiList.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 font-bold">
+                  Belum ada data nilai hafalan.
+                </div>
+              ) : nilaiList.filter(n => n.nama.toLowerCase().includes(searchTerm.toLowerCase())).map((n) => (
                 <div key={n.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-tosca-50/30 transition-all duration-300 group">
                   <div className="flex items-center gap-5">
                     <div className="h-14 w-14 rounded-2xl bg-tosca-600 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-tosca-100 group-hover:scale-110 transition-transform">

@@ -1,78 +1,106 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import Sidebar from '@/components/ui/sidebar';
 import Navbar from '@/components/ui/navbar';
-import { 
-  Users, 
-  UserSquare2, 
-  GraduationCap, 
-  TrendingUp, 
-  Calendar as CalendarIcon, 
-  Clock, 
-  ArrowUpRight, 
-  ArrowDownRight, 
+import {
+  Users,
+  UserSquare2,
+  GraduationCap,
+  TrendingUp,
+  Calendar as CalendarIcon,
+  Clock,
+  ArrowUpRight,
+  ArrowDownRight,
   Plus,
   CheckCircle2,
   X,
   ChevronRight,
   BookOpen,
   MessageSquare,
-  FileText
+  FileText,
+  School,
+  Activity
 } from 'lucide-react';
 import Link from 'next/link';
-
-const stats = [
-  { 
-    label: 'Total Santri', 
-    value: '450', 
-    icon: Users, 
-    change: '+12%', 
-    isPositive: true, 
-    color: 'bg-blue-50 text-blue-600',
-    href: '/dashboard/admin/santri'
-  },
-  { 
-    label: 'Total Musyrif/ah', 
-    value: '32', 
-    icon: UserSquare2, 
-    change: '+2', 
-    isPositive: true, 
-    color: 'bg-tosca-50 text-tosca-600',
-    href: '/dashboard/admin/musyrif'
-  },
-  { 
-    label: 'Rata-rata Hafalan', 
-    value: '12.5 Juz', 
-    icon: BookOpen, 
-    change: '-0.5%', 
-    isPositive: false, 
-    color: 'bg-orange-50 text-orange-600',
-    href: '/dashboard/admin/nilai'
-  },
-  { 
-    label: 'Peningkatan Nilai', 
-    value: '85%', 
-    icon: TrendingUp, 
-    change: '+5%', 
-    isPositive: true, 
-    color: 'bg-green-50 text-green-600',
-    href: '/dashboard/admin/nilai'
-  },
-];
-
-const activities = [
-  { id: 1, type: 'hafalan', user: 'Ust. Mansyur', action: 'menilai setoran', target: 'Ahmad Fauzi', time: '5 menit yang lalu', status: 'Lancar', detail: 'Santri Ahmad menyetorkan Juz 30 (An-Naba) dengan kelancaran yang baik.' },
-  { id: 2, type: 'sertifikat', user: 'Siti Aminah', action: 'mengajukan', target: 'Sertifikat Juz 5', time: '12 menit yang lalu', status: 'Proses', detail: 'Pengajuan sertifikat hafalan Juz 5 telah diterima dan sedang dalam verifikasi.' },
-  { id: 3, type: 'jadwal', user: 'Admin', action: 'memperbarui', target: 'Halaqah Sore', time: '1 jam yang lalu', status: 'Update', detail: 'Perubahan lokasi halaqah sore dari Pendopo ke Masjid Baitul Huffaz.' },
-  { id: 4, type: 'santri', user: 'Ust. Zulkifli', action: 'mendaftar', target: 'Santri Baru (Zaid)', time: '2 jam yang lalu', status: 'Baru', detail: 'Pendaftaran santri baru atas nama Zaid Al-Khair telah berhasil diverifikasi.' },
-];
 
 export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
   const [showToast, setShowToast] = useState(false);
+  const [stats, setStats] = useState({
+    totalSantri: 0,
+    totalMusyrif: 0,
+    totalKelas: 0,
+    rataHafalan: '0 Setoran'
+  });
+  const [activitiesList, setActivitiesList] = useState<any[]>([]);
+
+  // Load stats from localStorage
+  useEffect(() => {
+    const loadStats = () => {
+      // Count Santri
+      const storedSantri = localStorage.getItem('santri_list');
+      const totalSantri = storedSantri ? JSON.parse(storedSantri).length : 0;
+
+      // Count Musyrif
+      const storedMusyrif = localStorage.getItem('musyrif_list');
+      const totalMusyrif = storedMusyrif ? JSON.parse(storedMusyrif).length : 0;
+
+      // Count Kelas
+      const kelasList = [
+        { id: 'kelas-7a', nama: '7A - Tahfizh Dasar' },
+        { id: 'kelas-7b', nama: '7B - Tahfizh Dasar' },
+        { id: 'kelas-8a', nama: '8A - Tahfizh Menengah' },
+        { id: 'kelas-8b', nama: '8B - Tahfizh Menengah' },
+        { id: 'kelas-9a', nama: '9A - Tahfizh Lanjutan' },
+        { id: 'kelas-9b', nama: '9B - Tahfizh Lanjutan' },
+      ];
+      const totalKelas = kelasList.length;
+
+      // Calculate dynamic average juz or setoran
+      const storedHafalan = localStorage.getItem('baitul_hafalan_records');
+      let rataHafalan = '0 Setoran';
+      if (storedHafalan) {
+        try {
+          const parsed = JSON.parse(storedHafalan);
+          rataHafalan = `${parsed.length} Setoran`;
+
+          // Populate activities
+          const mapped = parsed.slice(0, 5).map((r: any, idx: number) => ({
+            id: r.id || idx.toString(),
+            type: 'hafalan',
+            user: 'Musyrif',
+            action: 'menilai setoran',
+            target: r.santriName,
+            time: r.createdAt || 'Baru saja',
+            status: r.status === 'Lanjut' ? 'Lancar' : 'Ulang',
+            detail: `Santri ${r.santriName} menyetorkan ${r.surah} (${r.ayat}) dengan rata-rata ${r.rata.toFixed(1)}.`
+          }));
+          setActivitiesList(mapped);
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        setActivitiesList([]);
+      }
+
+      setStats({
+        totalSantri,
+        totalMusyrif,
+        totalKelas,
+        rataHafalan
+      });
+    };
+
+    loadStats();
+    // Re-check on storage changes (for cross-tab sync)
+    window.addEventListener('storage', loadStats);
+    return () => window.removeEventListener('storage', loadStats);
+  }, []);
 
   const handleQuickAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,23 +115,72 @@ export default function AdminDashboard() {
       case 'sertifikat': return <GraduationCap size={20} className="text-orange-600" />;
       case 'jadwal': return <CalendarIcon size={20} className="text-blue-600" />;
       case 'santri': return <Users size={20} className="text-purple-600" />;
+      case 'kelas': return <School size={20} className="text-green-600" />;
       default: return <MessageSquare size={20} className="text-gray-600" />;
     }
   };
 
+  const dashboardStats = [
+    {
+      label: 'Total Santri',
+      value: stats.totalSantri.toString(),
+      icon: Users,
+      change: '+2',
+      isPositive: true,
+      color: 'bg-blue-50 text-blue-600',
+      href: '/dashboard/admin/santri',
+      description: 'Santri aktif terdaftar'
+    },
+    {
+      label: 'Total Musyrif/ah',
+      value: stats.totalMusyrif.toString(),
+      icon: UserSquare2,
+      change: '+0',
+      isPositive: true,
+      color: 'bg-tosca-50 text-tosca-600',
+      href: '/dashboard/admin/musyrif',
+      description: 'Guru & pengajar aktif'
+    },
+    {
+      label: 'Total Kelas',
+      value: stats.totalKelas.toString(),
+      icon: School,
+      change: '+0',
+      isPositive: true,
+      color: 'bg-green-50 text-green-600',
+      href: '/dashboard/admin/kelas',
+      description: 'Kelas/halaqah aktif'
+    },
+    {
+      label: 'Rata-rata Hafalan',
+      value: stats.rataHafalan,
+      icon: BookOpen,
+      change: '+0.5 Juz',
+      isPositive: true,
+      color: 'bg-orange-50 text-orange-600',
+      href: '/dashboard/admin/nilai',
+      description: 'Progress hafalan'
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-tosca-50/30">
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-      
+
       <div className="lg:pl-72 transition-all duration-300">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
-        
+
         <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
           {/* Header Card with White Background */}
           <div className="bg-white p-6 sm:p-8 rounded-3xl border border-tosca-50 shadow-sm mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-            <div className="space-y-1">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-tosca-900">Dashboard Admin</h1>
-              <p className="text-tosca-600 font-medium">Ringkasan aktivitas Baitul Huffaz hari ini.</p>
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-tosca-100 rounded-2xl">
+                <Activity size={28} className="text-tosca-600" />
+              </div>
+              <div className="space-y-1">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-tosca-900">Dashboard Admin</h1>
+                <p className="text-tosca-600 font-medium">Ringkasan aktivitas Baitul Huffaz hari ini.</p>
+              </div>
             </div>
             <div className="flex items-center gap-4">
               {showToast && (
@@ -112,19 +189,12 @@ export default function AdminDashboard() {
                   <span className="text-sm font-bold">Data Berhasil Ditambah!</span>
                 </div>
               )}
-              <button 
-                onClick={() => setIsQuickAddOpen(true)}
-                className="flex items-center justify-center gap-2 bg-tosca-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-tosca-200 hover:bg-tosca-700 transition-all active:scale-95"
-              >
-                <Plus size={20} />
-                Tambah Data Cepat
-              </button>
             </div>
           </div>
 
           {/* Stats Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {stats.map((stat) => (
+            {dashboardStats.map((stat) => (
               <Link key={stat.label} href={stat.href}>
                 <div className="bg-white p-6 rounded-3xl border border-tosca-50 shadow-sm hover:border-tosca-200 hover:shadow-md transition-all cursor-pointer group">
                   <div className="flex justify-between items-start mb-4">
@@ -136,8 +206,9 @@ export default function AdminDashboard() {
                       {stat.isPositive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
                     </div>
                   </div>
-                  <h3 className="text-tosca-500 text-sm font-bold uppercase tracking-wider">{stat.label}</h3>
+                  <h3 className="text-tosca-500 text-xs font-bold uppercase tracking-wider">{stat.label}</h3>
                   <p className="text-2xl font-black text-tosca-900 mt-1">{stat.value}</p>
+                  <p className="text-xs text-tosca-400 mt-1">{stat.description}</p>
                 </div>
               </Link>
             ))}
@@ -148,12 +219,18 @@ export default function AdminDashboard() {
             <div className="lg:col-span-2 bg-white rounded-3xl border border-tosca-50 shadow-sm overflow-hidden flex flex-col">
               <div className="p-6 border-b border-tosca-50 flex items-center justify-between bg-tosca-50/10">
                 <h2 className="text-lg font-black text-tosca-900">Aktivitas Terbaru</h2>
-                <button className="text-tosca-600 text-sm font-bold hover:text-tosca-900 transition-colors bg-white px-4 py-1.5 rounded-full border border-tosca-50 shadow-sm">Lihat Semua</button>
+                <Link href="/dashboard/admin/santri" className="text-tosca-600 text-sm font-bold hover:text-tosca-900 transition-colors bg-white px-4 py-1.5 rounded-full border border-tosca-50 shadow-sm">
+                  Lihat Semua
+                </Link>
               </div>
               <div className="flex-1 divide-y divide-tosca-50">
-                {activities.map((item) => (
-                  <div 
-                    key={item.id} 
+                {activitiesList.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 font-bold text-sm">
+                    Belum ada aktivitas hafalan terbaru.
+                  </div>
+                ) : activitiesList.map((item) => (
+                  <div
+                    key={item.id}
                     onClick={() => setSelectedActivity(item)}
                     className="p-5 flex items-start gap-4 hover:bg-tosca-50/50 transition-all cursor-pointer group"
                   >
@@ -170,8 +247,8 @@ export default function AdminDashboard() {
                           {item.time}
                         </p>
                         <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                          item.status === 'Lancar' ? 'bg-green-500 text-white' : 
-                          item.status === 'Baru' ? 'bg-purple-500 text-white' : 
+                          item.status === 'Lancar' ? 'bg-green-500 text-white' :
+                          item.status === 'Baru' ? 'bg-purple-500 text-white' :
                           item.status === 'Proses' ? 'bg-orange-500 text-white' : 'bg-blue-500 text-white'
                         }`}>
                           {item.status}
@@ -186,25 +263,66 @@ export default function AdminDashboard() {
 
             {/* Quick Actions & Schedule */}
             <div className="space-y-6">
+              {/* Quick Access Cards */}
               <div className="bg-tosca-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden group">
                 <div className="absolute -right-10 -bottom-10 opacity-10 group-hover:scale-110 transition-transform duration-500">
                   <GraduationCap size={200} />
                 </div>
-                <h3 className="text-xl font-black mb-2 relative z-10">Manajemen Nilai</h3>
+                <h3 className="text-xl font-black mb-2 relative z-10">Manajemen Santri</h3>
                 <p className="text-tosca-100 text-sm mb-8 relative z-10 opacity-80 leading-relaxed">
-                  Input dan monitoring setoran hafalan santri secara real-time.
+                  Daftar & kelola data lengkap ratusan santri dengan mudah.
                 </p>
-                <Link href="/dashboard/admin/nilai">
+                <Link href="/dashboard/admin/santri">
                   <button className="w-full bg-white text-tosca-900 py-3 rounded-2xl font-black text-sm relative z-10 hover:bg-tosca-50 transition-colors">
-                    Mulai Menilai
+                    Kelola Santri
                   </button>
                 </Link>
               </div>
 
+              {/* Quick Navigation */}
               <div className="bg-white rounded-3xl p-6 border border-tosca-50 shadow-sm">
-                <h3 className="text-lg font-black text-tosca-900 mb-6">Jadwal Hari Ini</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4 p-4 bg-tosca-50 rounded-2xl border border-transparent hover:border-tosca-200 transition-all cursor-pointer group">
+                <h3 className="text-lg font-black text-tosca-900 mb-4">Menu Cepat</h3>
+                <div className="space-y-3">
+                  <Link href="/dashboard/admin/kelas" className="flex items-center gap-3 p-3 bg-tosca-50 rounded-xl hover:bg-tosca-100 transition-colors group">
+                    <div className="p-2 bg-green-100 text-green-600 rounded-lg">
+                      <School size={18} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-tosca-900">Manajemen Kelas</p>
+                      <p className="text-xs text-tosca-500">{stats.totalKelas} kelas aktif</p>
+                    </div>
+                  </Link>
+                  <Link href="/dashboard/admin/musyrif" className="flex items-center gap-3 p-3 bg-tosca-50 rounded-xl hover:bg-tosca-100 transition-colors group">
+                    <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
+                      <UserSquare2 size={18} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-tosca-900">Manajemen Musyrif</p>
+                      <p className="text-xs text-tosca-500">{stats.totalMusyrif} musyrif aktif</p>
+                    </div>
+                  </Link>
+                  <Link href="/dashboard/admin/nilai" className="flex items-center gap-3 p-3 bg-tosca-50 rounded-xl hover:bg-tosca-100 transition-colors group">
+                    <div className="p-2 bg-orange-100 text-orange-600 rounded-lg">
+                      <BookOpen size={18} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-tosca-900">Input & Review Nilai</p>
+                      <p className="text-xs text-tosca-500">Setoran hafalan harian</p>
+                    </div>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Jadwal Hari Ini */}
+              <div className="bg-white rounded-3xl p-6 border border-tosca-50 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-black text-tosca-900">Jadwal Hari Ini</h3>
+                  <Link href="/dashboard/admin/jadwal" className="text-xs text-tosca-600 font-bold hover:underline">
+                    Lihat Semua
+                  </Link>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4 p-3 bg-tosca-50 rounded-xl border border-transparent hover:border-tosca-200 transition-all cursor-pointer group">
                     <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center text-tosca-600 shadow-sm group-hover:bg-tosca-600 group-hover:text-white transition-all">
                       <Clock size={20} />
                     </div>
@@ -213,7 +331,7 @@ export default function AdminDashboard() {
                       <p className="text-xs text-tosca-500 font-bold">05:00 - 07:00</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 p-4 bg-tosca-50 rounded-2xl border border-transparent hover:border-tosca-200 transition-all cursor-pointer group">
+                  <div className="flex items-center gap-4 p-3 bg-tosca-50 rounded-xl border border-transparent hover:border-tosca-200 transition-all cursor-pointer group">
                     <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-all">
                       <Clock size={20} />
                     </div>
@@ -223,11 +341,6 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
-                <Link href="/dashboard/admin/jadwal">
-                  <button className="w-full mt-6 py-3 border-2 border-tosca-50 text-tosca-600 rounded-2xl font-bold text-sm hover:bg-tosca-50 transition-all">
-                    Lihat Selengkapnya
-                  </button>
-                </Link>
               </div>
             </div>
           </div>
@@ -255,11 +368,16 @@ export default function AdminDashboard() {
                   {selectedActivity.user.charAt(0)}
                 </div>
                 <h3 className="text-xl font-black text-tosca-900">{selectedActivity.user}</h3>
-                <span className="px-3 py-1 bg-tosca-50 text-tosca-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-tosca-100">
+                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                  selectedActivity.status === 'Lancar' ? 'bg-green-100 text-green-700 border border-green-200' :
+                  selectedActivity.status === 'Baru' ? 'bg-purple-100 text-purple-700 border border-purple-200' :
+                  selectedActivity.status === 'Proses' ? 'bg-orange-100 text-orange-700 border border-orange-200' :
+                  'bg-blue-100 text-blue-700 border border-blue-200'
+                }`}>
                   {selectedActivity.status}
                 </span>
               </div>
-              
+
               <div className="space-y-4 bg-tosca-50/50 p-6 rounded-2xl border border-tosca-50">
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-tosca-400 font-bold uppercase text-[10px]">Tindakan</span>
@@ -280,7 +398,7 @@ export default function AdminDashboard() {
                 <p className="text-sm text-tosca-800 leading-relaxed font-medium">{selectedActivity.detail}</p>
               </div>
 
-              <button 
+              <button
                 onClick={() => setSelectedActivity(null)}
                 className="w-full py-4 bg-tosca-900 text-white rounded-2xl font-black shadow-xl shadow-tosca-100 active:scale-95 transition-all"
               >
@@ -304,18 +422,20 @@ export default function AdminDashboard() {
             <form onSubmit={handleQuickAdd} className="p-6 space-y-4">
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-tosca-900 ml-1">Nama Lengkap</label>
-                <input type="text" required className="w-full px-4 py-3 rounded-xl border border-tosca-100 font-bold text-black" placeholder="Nama santri/musyrif" />
+                <input type="text" required className="w-full px-4 py-3 rounded-xl border border-tosca-100 font-bold text-black" placeholder="Nama Santri / Musyrif" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-tosca-900 ml-1">Tipe Data</label>
                   <select className="w-full px-4 py-3 rounded-xl border border-tosca-100 font-bold text-tosca-900">
-                    <option>Santri</option><option>Musyrif/ah</option><option>Kelas</option>
+                    <option>Santri</option>
+                    <option>Musyrif/ah</option>
+                    <option>Kelas</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-tosca-900 ml-1">Keterangan</label>
-                  <input type="text" className="w-full px-4 py-3 rounded-xl border border-tosca-100 font-bold text-black" placeholder="Kelas/NIP/Nis" />
+                  <input type="text" className="w-full px-4 py-3 rounded-xl border border-tosca-100 font-bold text-black" placeholder="Kelas / NIS / NIP" />
                 </div>
               </div>
               <button type="submit" className="w-full py-4 bg-tosca-600 text-white rounded-2xl font-black shadow-lg shadow-tosca-100 mt-4">Simpan Data</button>

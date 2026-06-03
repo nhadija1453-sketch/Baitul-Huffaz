@@ -3,18 +3,21 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Users, 
-  UserSquare2, 
-  Calendar, 
-  GraduationCap, 
-  FileText, 
+import { useSettings } from '@/lib/hooks/useSettings';
+import {
+  LayoutDashboard,
+  Users,
+  UserSquare2,
+  Calendar,
+  GraduationCap,
+  FileText,
   Award,
   Settings,
   LogOut,
   X,
-  School
+  School,
+  BookOpen,
+  ClipboardList
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,17 +31,23 @@ const menuItems = [
   { icon: UserSquare2, label: 'Manajemen Musyrif/ah', href: '/dashboard/admin/musyrif' },
   { icon: School, label: 'Manajemen Kelas', href: '/dashboard/admin/kelas' },
   { icon: Calendar, label: 'Manajemen Jadwal', href: '/dashboard/admin/jadwal' },
+  { icon: BookOpen, label: 'Manajemen Hafalan', href: '/dashboard/admin/hafalan' },
+  { icon: ClipboardList, label: 'Manajemen Kehadiran', href: '/dashboard/admin/kehadiran' },
   { icon: GraduationCap, label: 'Manajemen Nilai', href: '/dashboard/admin/nilai' },
-  { icon: FileText, label: 'Raport', href: '/dashboard/admin/raport' },
   { icon: Award, label: 'Sertifikat', href: '/dashboard/admin/sertifikat' },
 ];
 
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { settings } = useSettings();
 
   const handleLogout = () => {
-    // In a real app, you would sign out from Supabase here
+    // Clear localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('baitul_user');
+      localStorage.removeItem('baitul_session');
+    }
     router.push('/login');
   };
 
@@ -61,10 +70,14 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           {/* Logo Section */}
           <div className="flex items-center justify-between p-6">
             <div className="flex items-center gap-3">
-              <div className="bg-tosca-600 p-2 rounded-xl">
-                <GraduationCap className="text-white h-6 w-6" />
+              <div className={`p-2 rounded-xl overflow-hidden flex items-center justify-center ${settings.logoUrl ? 'h-10 w-10 bg-white border border-tosca-100' : 'bg-tosca-600 h-10 w-10'}`}>
+                {settings.logoUrl ? (
+                  <img src={settings.logoUrl} alt="Logo" className="max-h-full max-w-full object-contain" />
+                ) : (
+                  <GraduationCap className="text-white h-6 w-6" />
+                )}
               </div>
-              <span className="text-xl font-bold text-tosca-900">Baitul Huffaz</span>
+              <span className="text-xl font-bold text-tosca-900">{settings.appName}</span>
             </div>
             <button 
               className="lg:hidden p-2 text-tosca-500 hover:bg-tosca-50 rounded-lg"

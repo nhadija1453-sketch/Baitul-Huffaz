@@ -16,11 +16,7 @@ import {
   User
 } from 'lucide-react';
 
-const scheduleData = [
-  { time: '05:00 - 07:00', title: 'Tahfizh Pagi', instructor: 'Ust. Mansyur', location: 'Masjid Utama' },
-  { time: '07:30 - 09:00', title: 'Tahsin Wal Imla', instructor: 'Usth. Siti', location: 'Ruang Kelas 7' },
-  { time: '16:00 - 17:30', title: 'Murojaah Bersama', instructor: 'Ust. Zulkifli', location: 'Pendopo' },
-];
+const scheduleData: any[] = [];
 
 export default function ManajemenJadwal() {
   const [sidebarOpen, setSidebarOpen] = useState(false);

@@ -2,12 +2,15 @@
 
 import React from 'react';
 import { Menu, Bell, Search, User } from 'lucide-react';
+import { useSettings } from '@/lib/hooks/useSettings';
 
 interface NavbarProps {
   onMenuClick: () => void;
 }
 
 export default function Navbar({ onMenuClick }: NavbarProps) {
+  const { settings } = useSettings();
+  
   return (
     <header className="sticky top-0 z-30 h-16 bg-white/80 backdrop-blur-md border-b border-tosca-50">
       <div className="flex h-full items-center justify-between px-4 lg:px-8">
@@ -26,6 +29,10 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
               placeholder="Cari sesuatu..." 
               className="bg-transparent border-none focus:ring-0 text-sm text-tosca-900 placeholder:text-tosca-400 w-48 md:w-64"
             />
+          </div>
+
+          <div className="hidden md:flex items-center gap-2 bg-tosca-100/50 text-tosca-800 px-3.5 py-1.5 rounded-xl border border-tosca-100 font-extrabold text-xs">
+            <span>Tahun Ajaran: {settings.tahunAjaran}</span>
           </div>
         </div>
 

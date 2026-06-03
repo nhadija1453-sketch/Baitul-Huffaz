@@ -4,16 +4,14 @@ import React, { useState } from 'react';
 import Sidebar from '@/components/ui/sidebar';
 import Navbar from '@/components/ui/navbar';
 import { Plus, School, Users as UsersIcon, User as UserIcon, X, CheckCircle2 } from 'lucide-react';
+import { useSettings } from '@/lib/hooks/useSettings';
 
-const dummyKelas = [
-  { id: 1, nama: '7A - Tahfizh Dasar', wali: 'Ust. Mansyur', jmlSantri: 25 },
-  { id: 2, nama: '8A - Tahfizh Menengah', wali: 'Usth. Siti Khadijah', jmlSantri: 20 },
-  { id: 3, nama: '9A - Tahfizh Lanjutan', wali: 'Ust. Zulkifli', jmlSantri: 15 },
-];
+const dummyKelas: any[] = [];
 
 export default function ManajemenKelas() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { settings } = useSettings();
   const [showToast, setShowToast] = useState(false);
 
   const triggerToast = () => {
@@ -66,7 +64,7 @@ export default function ManajemenKelas() {
                     <School size={100} />
                   </div>
                   <h3 className="text-xl font-bold relative z-10">{kelas.nama}</h3>
-                  <p className="text-tosca-100 text-sm opacity-80 relative z-10">Tahun Ajaran 2024/2025</p>
+                  <p className="text-tosca-100 text-sm opacity-80 relative z-10">Tahun Ajaran {settings.tahunAjaran}</p>
                 </div>
                 <div className="p-6 space-y-4">
                   <div className="flex items-center justify-between py-2 border-b border-tosca-50">
@@ -127,7 +125,7 @@ export default function ManajemenKelas() {
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-tosca-700 ml-1">Tahun Ajaran</label>
-                <input type="text" defaultValue="2024/2025" className="w-full px-4 py-3 rounded-xl border border-tosca-100 bg-tosca-50/50 text-tosca-500 text-sm font-medium cursor-not-allowed" disabled />
+                <input type="text" value={settings.tahunAjaran} className="w-full px-4 py-3 rounded-xl border border-tosca-100 bg-tosca-50/50 text-tosca-500 text-sm font-medium cursor-not-allowed" disabled readOnly />
               </div>
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-3 border-2 border-tosca-50 text-tosca-600 rounded-xl font-bold hover:bg-tosca-50 transition-colors">Batal</button>

@@ -7,7 +7,10 @@ const { Pool } = pg;
 const connectionString = process.env.DATABASE_URL ||
   'postgresql://user:password@host/dbname?sslmode=require';
 
-export const pool = new Pool({
+// Standard Next.js serverless singleton pattern for pool
+const globalForPg = globalThis as unknown as { pgPool: pg.Pool };
+
+export const pool = globalForPg.pgPool || new Pool({
   connectionString,
   ssl: {
     rejectUnauthorized: false,
@@ -16,6 +19,10 @@ export const pool = new Pool({
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPg.pgPool = pool;
+}
 
 // Helper function for queries
 export async function query<T>(text: string, params?: unknown[]): Promise<T[]> {
