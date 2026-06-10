@@ -29,6 +29,7 @@ interface Santri {
   nama_lengkap: string;
   kelas_id: string;
   kelas_nama: string;
+  kelas_level: number;
   nama_ayah: string;
   nama_ibu: string;
   pekerjaan_ayah: string;
@@ -39,16 +40,6 @@ interface Santri {
   is_active: boolean;
   created_at: string;
 }
-
-// Dummy data untuk Kelas (seharusnya dari database)
-const kelasList = [
-  { id: 'kelas-7a', nama: '7A - Tahfizh Dasar' },
-  { id: 'kelas-7b', nama: '7B - Tahfizh Dasar' },
-  { id: 'kelas-8a', nama: '8A - Tahfizh Menengah' },
-  { id: 'kelas-8b', nama: '8B - Tahfizh Menengah' },
-  { id: 'kelas-9a', nama: '9A - Tahfizh Lanjutan' },
-  { id: 'kelas-9b', nama: '9B - Tahfizh Lanjutan' },
-];
 
 // Initial dummy data
 const initialSantri: Santri[] = [];
@@ -93,21 +84,28 @@ export default function ManajemenSantri() {
     username: '',
     password: '',
   });
+  const [formLevel, setFormLevel] = useState('7');
 
   const [santriList, setSantriList] = useState<Santri[]>([]);
+  const [kelasOptions, setKelasOptions] = useState<any[]>([]);
 
-  const loadSantri = async () => {
+  const loadData = async () => {
     try {
-      const res = await fetch('/api/santri');
-      const json = await res.json();
-      if (json.data) setSantriList(json.data);
+      const [santriRes, kelasRes] = await Promise.all([
+        fetch('/api/santri'),
+        fetch('/api/kelas'),
+      ]);
+      const santriJson = await santriRes.json();
+      const kelasJson = await kelasRes.json();
+      if (santriJson.data) setSantriList(santriJson.data);
+      if (kelasJson.data) setKelasOptions(kelasJson.data);
     } catch (err) {
-      console.error('Failed to load santri', err);
+      console.error('Failed to load data', err);
     }
   };
 
   useEffect(() => {
-    loadSantri();
+    loadData();
   }, []);
 
   // Generate NISN unik
@@ -153,6 +151,7 @@ export default function ManajemenSantri() {
     setShowPassword(false);
     setEditingSantri(null);
     setIsEditMode(false);
+    setFormLevel('7');
   };
 
   const openAddModal = () => {
@@ -230,7 +229,7 @@ export default function ManajemenSantri() {
         triggerToast(`Santri "${formData.nama_lengkap}" berhasil ditambahkan!`);
       }
 
-      await loadSantri();
+      await loadData();
     } catch (err) {
       console.error('Save failed', err);
       triggerToast('Gagal menyimpan data santri.');
@@ -247,7 +246,7 @@ export default function ManajemenSantri() {
         const res = await fetch(`/api/santri/${id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Failed to delete');
         triggerToast('Data Santri Berhasil Dihapus!');
-        await loadSantri();
+        await loadData();
       } catch (err) {
         console.error('Delete failed', err);
         triggerToast('Gagal menghapus data santri.');
@@ -260,7 +259,8 @@ export default function ManajemenSantri() {
     s.nama_lengkap?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.nis?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.nisn?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.username?.toLowerCase().includes(searchTerm.toLowerCase())
+    s.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.kelas_nama?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Download template CSV
@@ -393,7 +393,8 @@ export default function ManajemenSantri() {
                     <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">NIS</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">NISN</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Nama Lengkap</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Kelas/Level</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Kelas</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Level</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Nama Ayah</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Nama Ibu</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Pekerjaan Ayah</th>
@@ -414,6 +415,11 @@ export default function ManajemenSantri() {
                       <td className="px-4 py-3">
                         <span className="px-2.5 py-1 bg-tosca-100 text-tosca-700 rounded-full text-[10px] font-bold">
                           {santri.kelas_nama}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="px-2.5 py-1 bg-purple-100 text-purple-700 rounded-full text-[10px] font-bold">
+                          Level {santri.kelas_level}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-tosca-600">{santri.nama_ayah}</td>
@@ -540,21 +546,35 @@ export default function ManajemenSantri() {
                 />
               </div>
 
-              {/* Kelas/Level - Sinkron dengan Manajemen Kelas */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-tosca-700 ml-1">Kelas/Level</label>
-                <select
-                  name="kelas_id"
-                  value={formData.kelas_id}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm text-[#0B7D72]"
-                >
-                  <option value="">-- Pilih Kelas --</option>
-                  {kelasList.map(k => (
-                    <option key={k.id} value={k.id}>{k.nama}</option>
-                  ))}
-                </select>
+              {/* Kelas & Level */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-tosca-700 ml-1">Kelas</label>
+                  <select
+                    name="kelas_id"
+                    value={formData.kelas_id}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm text-[#0B7D72]"
+                  >
+                    <option value="">-- Pilih Kelas --</option>
+                    {kelasOptions.map(k => (
+                      <option key={k.id} value={k.id}>{k.nama}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-tosca-700 ml-1">Level</label>
+                  <select
+                    value={formLevel}
+                    onChange={e => setFormLevel(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm text-[#0B7D72]"
+                  >
+                    {[7, 8, 9, 10, 11, 12].map(l => (
+                      <option key={l} value={l}>Level {l}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Nama Orang Tua */}

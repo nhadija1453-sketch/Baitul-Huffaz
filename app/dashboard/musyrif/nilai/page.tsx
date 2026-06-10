@@ -1,41 +1,40 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { GraduationCap, ArrowLeft, Star, Home, BookOpen, CheckSquare, Calendar, Target, Award } from 'lucide-react';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function NilaiPage() {
-  const [santriList, setSantriList] = React.useState<any[]>([]);
+  const { user } = useAuth();
+  const [santriList, setSantriList] = useState<any[]>([]);
 
-  React.useEffect(() => {
-    // Fetch santri list
+  useEffect(() => {
+    if (!user) return;
     fetch('/api/santri')
       .then(res => res.json())
       .then(santriData => {
         if (!santriData.data) return;
-        
-        // Fetch setoran (hafalan records)
-        return fetch('/api/setoran')
+        return fetch(`/api/setoran?musyrif_id=${user.id}`)
           .then(res => res.json())
           .then(setoranData => {
             const hafalanRecords = setoranData.data || [];
-            
             const mapped = santriData.data.map((s: any) => {
-              const myRecs = hafalanRecords.filter((r: any) => r.santri_id === s.id || r.santriId === s.id);
-              const latest = myRecs[0] || { tajwid: 0, makhraj: 0, kelancaran: 0 };
+              const myRecs = hafalanRecords.filter((r: any) => r.santuario_id === s.id);
+              const latest = myRecs[0] || { tajwid_score: 0, makhraj_score: 0, kelancaran_score: 0 };
               return {
                 id: s.id,
                 nama: s.nama_lengkap,
-                tajwid: latest.tajwid ?? latest.tajwid_nilai ?? 0,
-                makhraj: latest.makhraj ?? latest.makhraj_nilai ?? 0,
-                kelancaran: latest.kelancaran ?? latest.kelancaran_nilai ?? 0
+                tajwid: latest.tajwid_score ?? 0,
+                makhraj: latest.makhraj_score ?? 0,
+                kelancaran: latest.kelancaran_score ?? 0
               };
             });
             setSantriList(mapped);
           });
       })
       .catch(e => console.error('Gagal fetch nilai musyrif:', e));
-  }, []);
+  }, [user]);
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-24 lg:pb-8">
       {/* Header */}

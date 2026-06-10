@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS kelas (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   nama VARCHAR(100) NOT NULL,
+  level INT NOT NULL DEFAULT 7 CHECK (level >= 7 AND level <= 12),
   deskripsi TEXT,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

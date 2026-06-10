@@ -10,6 +10,8 @@ export interface UserRow {
   nip: string | null;
   role: 'SANTRI' | 'MUSYRIF' | 'ADMIN';
   kelas_id: string | null;
+  kelas_nama: string | null;
+  kelas_level: number | null;
   avatar_url: string | null;
   is_active: boolean;
   target_hafalan: number;
@@ -54,7 +56,7 @@ export async function createUser(data: {
 
 export async function getAllUsersByRole(role: string): Promise<UserRow[]> {
   const sql = `
-    SELECT u.*, k.nama as kelas_nama
+    SELECT u.*, k.nama as kelas_nama, k.level as kelas_level
     FROM users u
     LEFT JOIN kelas k ON u.kelas_id = k.id
     WHERE u.role = $1 AND u.is_active = true
@@ -65,7 +67,7 @@ export async function getAllUsersByRole(role: string): Promise<UserRow[]> {
 
 export async function getUsersByKelas(kelasId: string): Promise<UserRow[]> {
   const sql = `
-    SELECT u.*, k.nama as kelas_nama
+    SELECT u.*, k.nama as kelas_nama, k.level as kelas_level
     FROM users u
     LEFT JOIN kelas k ON u.kelas_id = k.id
     WHERE u.kelas_id = $1 AND u.role = 'SANTRI' AND u.is_active = true

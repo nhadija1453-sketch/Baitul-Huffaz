@@ -23,22 +23,35 @@ export default function ManajemenJadwal() {
   const [selectedDay, setSelectedDay] = useState(16);
   const [scheduleData, setScheduleData] = useState<any[]>([]);
   const [formSesi, setFormSesi] = useState('');
+  const [formKelasId, setFormKelasId] = useState('');
+  const [formLevel, setFormLevel] = useState('');
   const [formJamMulai, setFormJamMulai] = useState('');
   const [formJamSelesai, setFormJamSelesai] = useState('');
+  const [formMusyrifId, setFormMusyrifId] = useState('');
   const [formLokasi, setFormLokasi] = useState('');
+  const [kelasOptions, setKelasOptions] = useState<any[]>([]);
+  const [musyrifOptions, setMusyrifOptions] = useState<any[]>([]);
 
-  const loadJadwal = async () => {
+  const loadData = async () => {
     try {
-      const res = await fetch('/api/jadwal');
-      const json = await res.json();
-      if (json.data) setScheduleData(json.data);
+      const [jadwalRes, kelasRes, musyrifRes] = await Promise.all([
+        fetch('/api/jadwal'),
+        fetch('/api/kelas'),
+        fetch('/api/musyrif'),
+      ]);
+      const jadwalJson = await jadwalRes.json();
+      const kelasJson = await kelasRes.json();
+      const musyrifJson = await musyrifRes.json();
+      if (jadwalJson.data) setScheduleData(jadwalJson.data);
+      if (kelasJson.data) setKelasOptions(kelasJson.data);
+      if (musyrifJson.data) setMusyrifOptions(musyrifJson.data);
     } catch (err) {
-      console.error('Failed to load jadwal', err);
+      console.error('Failed to load data', err);
     }
   };
 
   useEffect(() => {
-    loadJadwal();
+    loadData();
   }, []);
 
   const triggerToast = () => {
@@ -58,21 +71,28 @@ export default function ManajemenJadwal() {
           jam_selesai: formJamSelesai,
           lokasi: formLokasi,
           hari: `2026-05-${String(selectedDay).padStart(2, '0')}`,
+          kelas_id: formKelasId || null,
+          musyrif_id: formMusyrifId || null,
           is_active: true,
         }),
       });
       if (!res.ok) throw new Error('Failed to create jadwal');
       setIsModalOpen(false);
       setFormSesi('');
+      setFormKelasId('');
+      setFormLevel('');
       setFormJamMulai('');
       setFormJamSelesai('');
+      setFormMusyrifId('');
       setFormLokasi('');
       triggerToast();
-      await loadJadwal();
+      await loadData();
     } catch (err) {
       console.error('Failed to create jadwal', err);
     }
   };
+
+  const selectedKelas = kelasOptions.find(k => k.id === formKelasId);
 
   return (
     <div className="min-h-screen bg-tosca-50/30">
@@ -214,6 +234,21 @@ export default function ManajemenJadwal() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-tosca-700 ml-1">Pilihan Kelas</label>
+                  <select value={formKelasId} onChange={e => { setFormKelasId(e.target.value); const k = kelasOptions.find(kk => kk.id === e.target.value); setFormLevel(k ? `Level ${k.level}` : ''); }} className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-bold text-tosca-900">
+                    <option value="">-- Pilih Kelas --</option>
+                    {kelasOptions.map(k => (
+                      <option key={k.id} value={k.id}>{k.nama}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-tosca-700 ml-1">Pilihan Level</label>
+                  <input type="text" value={formLevel} readOnly className="w-full px-4 py-3 rounded-xl border border-tosca-100 bg-tosca-50/50 focus:ring-2 focus:ring-tosca-500 text-sm text-[#0B7D72] font-bold cursor-not-allowed" placeholder="Pilih kelas terlebih dahulu" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
                   <label className="text-sm font-bold text-tosca-700 ml-1">Jam Mulai</label>
                   <input type="time" value={formJamMulai} onChange={e => setFormJamMulai(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm text-[#0B7D72] font-medium" />
                 </div>
@@ -223,16 +258,19 @@ export default function ManajemenJadwal() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-tosca-700 ml-1">Pengajar (Musyrif/ah)</label>
-                <select className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-bold text-tosca-900">
-                  <option>Ust. Mansyur</option>
-                  <option>Usth. Siti Khadijah</option>
-                  <option>Ust. Zulkifli</option>
+                <label className="text-sm font-bold text-tosca-700 ml-1">Musyrif/ah</label>
+                <select value={formMusyrifId} onChange={e => setFormMusyrifId(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-bold text-tosca-900">
+                  <option value="">-- Pilih Musyrif/ah --</option>
+                  {musyrifOptions
+                    .filter(m => !formKelasId || m.kelas_id === formKelasId)
+                    .map(m => (
+                      <option key={m.id} value={m.id}>{m.nip} — {m.full_name}</option>
+                    ))}
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-tosca-700 ml-1">Lokasi</label>
-                <input type="text" value={formLokasi} onChange={e => setFormLokasi(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm text-[#0B7D72] font-medium" placeholder="Nama ruangan atau gedung" />
+                <label className="text-sm font-bold text-tosca-700 ml-1">Kelas</label>
+                <input type="text" value={formLokasi} onChange={e => setFormLokasi(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm text-[#0B7D72] font-medium" placeholder="Nama ruangan" />
               </div>
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-3 border-2 border-tosca-50 text-tosca-600 rounded-xl font-bold hover:bg-tosca-50 transition-colors">Batal</button>

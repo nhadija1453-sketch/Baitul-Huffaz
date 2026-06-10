@@ -36,7 +36,15 @@ export default function JadwalSantriPage() {
 
       const res = await fetch(`/api/jadwal?kelas_id=${match.kelas_id}`);
       const data = await res.json();
-      setJadwalList(data.data || []);
+      const mapped = (data.data || []).map((j: any) => ({
+        id: j.id,
+        sesi: j.sesi || '',
+        jam: j.jam_mulai ? j.jam_mulai.slice(0, 5) : '',
+        lokasi: j.lokasi || '',
+        musyrif: j.musyrif_name || '',
+        hari: j.hari || ''
+      }));
+      setJadwalList(mapped);
     } catch (e) {
       console.error(e);
     }

@@ -71,10 +71,11 @@ export default function SetoranHafalanMusyrifPage() {
   const [inputKelancaran, setInputKelancaran] = useState('80');
 
   const loadData = async () => {
+    if (!user) return;
     try {
       const [santriRes, setoranRes] = await Promise.all([
         fetch('/api/santri'),
-        fetch('/api/setoran')
+        fetch(`/api/setoran?musyrif_id=${user.id}`)
       ]);
       if (santriRes.ok) {
         const santriData = await santriRes.json();
@@ -106,8 +107,8 @@ export default function SetoranHafalanMusyrifPage() {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (user) loadData();
+  }, [user]);
 
   const openAssessmentModal = (santri: Santri) => {
     setSelectedSantri(santri);

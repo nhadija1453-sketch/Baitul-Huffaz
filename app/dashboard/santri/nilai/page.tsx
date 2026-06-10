@@ -44,8 +44,23 @@ export default function NilaiSantriPage() {
     try {
       const res = await fetch(`/api/setoran?santuario_id=${user.id}`);
       const data = await res.json();
-      const allRecords: HafalanRecord[] = data.data || [];
-      setRiwayat(allRecords);
+      const mapped: HafalanRecord[] = (data.data || []).map((r: any) => ({
+        id: r.id,
+        santriId: r.santuario_id,
+        santriName: r.santri_name || '',
+        kelasId: '',
+        kelasNama: '',
+        nis: r.nis || '',
+        surah: r.surah || '',
+        ayat: r.ayat_start ? (r.ayat_end ? `${r.ayat_start}-${r.ayat_end}` : String(r.ayat_start)) : '',
+        tajwid: r.tajwid_score || 0,
+        makhraj: r.makhraj_score || 0,
+        kelancaran: r.kelancaran_score || 0,
+        rata: r.rata_rata || 0,
+        status: r.status === 'LANJUT' ? 'Lanjut' as const : 'Ulang' as const,
+        createdAt: r.created_at || ''
+      }));
+      setRiwayat(mapped);
     } catch (e) {
       console.error(e);
     }

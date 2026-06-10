@@ -79,7 +79,25 @@ export default function ManajemenHafalanAdminPage() {
       const santriJson = await santriRes.json();
       if (santriJson.data) setSantriList(santriJson.data);
       const setoranJson = await setoranRes.json();
-      if (setoranJson.data) setRecords(setoranJson.data);
+      if (setoranJson.data) {
+        const mapped = (setoranJson.data || []).map((r: any) => ({
+          id: r.id,
+          santriId: r.santuario_id,
+          santriName: r.santri_name || '',
+          kelasId: r.kelas_id || '',
+          kelasNama: r.kelas_nama || '',
+          nis: r.nis || '',
+          surah: r.surah || '',
+          ayat: r.ayat_start ? (r.ayat_end ? `${r.ayat_start}-${r.ayat_end}` : String(r.ayat_start)) : '',
+          tajwid: r.tajwid_score || 0,
+          makhraj: r.makhraj_score || 0,
+          kelancaran: r.kelancaran_score || 0,
+          rata: r.rata_rata || 0,
+          status: r.status === 'LANJUT' ? 'Lanjut' as const : 'Ulang' as const,
+          createdAt: r.created_at || ''
+        }));
+        setRecords(mapped);
+      }
     } catch (e) {
       console.error('Error loading data', e);
     }

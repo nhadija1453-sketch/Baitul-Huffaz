@@ -12,20 +12,28 @@ export default function ManajemenKelas() {
   const { settings } = useSettings();
   const [showToast, setShowToast] = useState(false);
   const [kelasList, setKelasList] = useState<any[]>([]);
+  const [musyrifList, setMusyrifList] = useState<any[]>([]);
   const [formNama, setFormNama] = useState('');
+  const [formLevel, setFormLevel] = useState('7');
+  const [formMusyrif, setFormMusyrif] = useState('');
 
-  const loadKelas = async () => {
+  const loadData = async () => {
     try {
-      const res = await fetch('/api/kelas');
-      const json = await res.json();
-      if (json.data) setKelasList(json.data);
+      const [kelasRes, musyrifRes] = await Promise.all([
+        fetch('/api/kelas'),
+        fetch('/api/musyrif'),
+      ]);
+      const kelasJson = await kelasRes.json();
+      const musyrifJson = await musyrifRes.json();
+      if (kelasJson.data) setKelasList(kelasJson.data);
+      if (musyrifJson.data) setMusyrifList(musyrifJson.data);
     } catch (err) {
-      console.error('Failed to load kelas', err);
+      console.error('Failed to load data', err);
     }
   };
 
   useEffect(() => {
-    loadKelas();
+    loadData();
   }, []);
 
   const triggerToast = () => {
@@ -39,13 +47,15 @@ export default function ManajemenKelas() {
       const res = await fetch('/api/kelas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nama: formNama }),
+        body: JSON.stringify({ nama: formNama, level: parseInt(formLevel), musyrif_id: formMusyrif || null }),
       });
       if (!res.ok) throw new Error('Failed to create kelas');
       setIsModalOpen(false);
       setFormNama('');
+      setFormLevel('7');
+      setFormMusyrif('');
       triggerToast();
-      await loadKelas();
+      await loadData();
     } catch (err) {
       console.error('Failed to create kelas', err);
     }
@@ -90,7 +100,7 @@ export default function ManajemenKelas() {
                     <School size={100} />
                   </div>
                   <h3 className="text-xl font-bold relative z-10">{kelas.nama}</h3>
-                  <p className="text-tosca-100 text-sm opacity-80 relative z-10">Tahun Ajaran {settings.tahunAjaran}</p>
+                  <p className="text-tosca-100 text-sm opacity-80 relative z-10">Level {kelas.level} — Tahun Ajaran {settings.tahunAjaran}</p>
                 </div>
                 <div className="p-6 space-y-4">
                   <div className="flex items-center justify-between py-2 border-b border-tosca-50">
@@ -141,12 +151,20 @@ export default function ManajemenKelas() {
                 <input type="text" value={formNama} onChange={e => setFormNama(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm text-[#0B7D72] font-medium" placeholder="Contoh: 7B - Tahfizh Dasar" />
               </div>
               <div className="space-y-1.5">
+                <label className="text-sm font-bold text-tosca-700 ml-1">Level</label>
+                <select value={formLevel} onChange={e => setFormLevel(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-bold text-tosca-900">
+                  {[7, 8, 9, 10, 11, 12].map(l => (
+                    <option key={l} value={l}>Level {l}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
                 <label className="text-sm font-bold text-tosca-700 ml-1">Musyrif/ah</label>
-                <select className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-bold text-tosca-900">
-                  <option>Ust. Mansyur</option>
-                  <option>Usth. Siti Khadijah</option>
-                  <option>Ust. Zulkifli</option>
-                  <option>Usth. Maryam</option>
+                <select value={formMusyrif} onChange={e => setFormMusyrif(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-bold text-tosca-900">
+                  <option value="">-- Pilih Musyrif/ah --</option>
+                  {musyrifList.map(m => (
+                    <option key={m.id} value={m.id}>{m.nip} — {m.full_name}</option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-1.5">

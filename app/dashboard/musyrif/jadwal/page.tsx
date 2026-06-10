@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { GraduationCap, ArrowLeft, Calendar, CheckCircle2, Home, BookOpen, Star, CheckSquare, Target, Award, User } from 'lucide-react';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 interface JadwalData {
   id: number;
@@ -14,32 +15,36 @@ interface JadwalData {
 }
 
 export default function JadwalMusyrifPage() {
+  const { user } = useAuth();
   const [jadwalList, setJadwalList] = useState<JadwalData[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Load jadwal dari API
-  useEffect(() => {
-    const fetchJadwal = async () => {
-      try {
-        const res = await fetch('/api/jadwal');
-        if (res.ok) {
-          const data = await res.json();
-          const mapped = (data.data || []).map((j: any) => ({
-            id: j.id,
-            sesi: j.sesi || '',
-            jam: j.jam || '',
-            lokasi: j.lokasi || '',
-            musyrif: j.musyrif || '',
-            hari: j.hari || ''
-          }));
-          setJadwalList(mapped);
-        }
-      } catch (e) {
-        console.error(e);
+  const formatJam = (jamMulai: string) => jamMulai ? jamMulai.slice(0, 5) : '';
+
+  const fetchJadwal = async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`/api/jadwal?musyrif_id=${user.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = (data.data || []).map((j: any) => ({
+          id: j.id,
+          sesi: j.sesi || '',
+          jam: formatJam(j.jam_mulai),
+          lokasi: j.lokasi || '',
+          musyrif: j.musyrif_name || '',
+          hari: j.hari || ''
+        }));
+        setJadwalList(mapped);
       }
-    };
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
     fetchJadwal();
-  }, []);
+  }, [user]);
 
   const showNotification = (message: string) => {
     setNotification(message);
@@ -48,29 +53,9 @@ export default function JadwalMusyrifPage() {
 
   // Listen for updates from other pages
   useEffect(() => {
-    const pollJadwal = async () => {
-      try {
-        const res = await fetch('/api/jadwal');
-        if (res.ok) {
-          const data = await res.json();
-          const mapped = (data.data || []).map((j: any) => ({
-            id: j.id,
-            sesi: j.sesi || '',
-            jam: j.jam || '',
-            lokasi: j.lokasi || '',
-            musyrif: j.musyrif || '',
-            hari: j.hari || ''
-          }));
-          setJadwalList(mapped);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    };
-
-    const interval = setInterval(pollJadwal, 2000);
+    const interval = setInterval(fetchJadwal, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const getHariLabel = (hari: string) => {
     const hariLabels: Record<string, string> = {
