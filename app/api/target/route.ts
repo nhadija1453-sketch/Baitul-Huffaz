@@ -8,6 +8,7 @@ export interface TargetHafalan {
   ayat_start: number | null;
   ayat_end: number | null;
   juz: number | null;
+  progres: number;
   target_date: string;
   status: 'BELUM' | 'SELESAI' | 'TERLAMBAT';
   catatan: string | null;
@@ -55,13 +56,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const sql = `
-      INSERT INTO target_hafalan (santuario_id, surah, ayat_start, ayat_end, juz, target_date, status, catatan)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO target_hafalan (santuario_id, surah, ayat_start, ayat_end, juz, progres, target_date, status, catatan)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `;
     const data = await queryOne<TargetHafalan>(sql, [
       body.santuario_id, body.surah, body.ayat_start ?? null, body.ayat_end ?? null,
-      body.juz ?? null, body.target_date, body.status ?? 'BELUM', body.catatan ?? null
+      body.juz ?? null, body.progres ?? 0, body.target_date, body.status ?? 'BELUM', body.catatan ?? null
     ]);
     return NextResponse.json({ data });
   } catch (error) {

@@ -15,32 +15,28 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   full_name VARCHAR(255) NOT NULL,
   role VARCHAR(20) NOT NULL DEFAULT 'SANTRI' CHECK (role IN ('ADMIN', 'MUSYRIF', 'SANTRI')),
-  avatar_url VARCHAR(500),
   nis VARCHAR(50),
   nip VARCHAR(50),
   kelas_id UUID,
-  phone VARCHAR(20),
-  address TEXT,
+  avatar_url VARCHAR(500),
+  target_hafalan INT DEFAULT 30,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- ============================================
--- TABLE: kelas (Halaqah/Group)
+-- TABLE: kelas
 -- ============================================
 CREATE TABLE IF NOT EXISTS kelas (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   nama VARCHAR(100) NOT NULL,
-  tingkat VARCHAR(50),
-  musyrif_id UUID REFERENCES users(id),
-  kapasitas INT DEFAULT 30,
+  deskripsi TEXT,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Add foreign key to users
 ALTER TABLE users ADD CONSTRAINT fk_users_kelas FOREIGN KEY (kelas_id) REFERENCES kelas(id);
 
 -- ============================================
@@ -96,7 +92,9 @@ CREATE TABLE IF NOT EXISTS absensi (
   jam_hadir TIME,
   jam_pulang TIME,
   keterangan TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE (santuario_id, tanggal)
 );
 
 -- ============================================
@@ -110,7 +108,8 @@ CREATE TABLE IF NOT EXISTS evaluasi (
   predikat_kedisiplinan VARCHAR(50),
   catatan TEXT,
   periode VARCHAR(20),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- ============================================
@@ -119,10 +118,14 @@ CREATE TABLE IF NOT EXISTS evaluasi (
 CREATE TABLE IF NOT EXISTS target_hafalan (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   santuario_id UUID NOT NULL REFERENCES users(id),
-  juz_target INT NOT NULL,
-  tgl_target DATE,
+  surah VARCHAR(100),
+  ayat_start INT,
+  ayat_end INT,
+  juz INT,
   progres INT DEFAULT 0 CHECK (progres >= 0 AND progres <= 100),
-  status VARCHAR(20) DEFAULT 'AKTIF' CHECK (status IN ('AKTIF', 'SELESAI', 'GAGAL')),
+  target_date DATE,
+  status VARCHAR(20) DEFAULT 'BELUM' CHECK (status IN ('BELUM', 'SELESAI', 'TERLAMBAT')),
+  catatan TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -137,29 +140,9 @@ CREATE TABLE IF NOT EXISTS sertifikat (
   tgl_cetak DATE,
   no_sertifikat VARCHAR(100),
   file_url VARCHAR(500),
-  status VARCHAR(20) DEFAULT 'TERBIT' CHECK (status IN ('TERBIT', 'DALAM_PROSES', 'DIBATALKAN')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ============================================
--- TABLE: raport
--- ============================================
-CREATE TABLE IF NOT EXISTS raport (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  santuario_id UUID NOT NULL REFERENCES users(id),
-  musyrif_id UUID NOT NULL REFERENCES users(id),
-  periode VARCHAR(20) NOT NULL,
-  tahun_ajaran VARCHAR(20),
-  rata_rata_tajwid DECIMAL(5,2),
-  rata_rata_makhraj DECIMAL(5,2),
-  rata_rata_kelancaran DECIMAL(5,2),
-  rata_rata_total DECIMAL(5,2),
-  predikat_akhlak VARCHAR(50),
-  jumlah_setoran INT,
-  total_juz_habis INT,
-  catatan_pembimbing TEXT,
-  tgl_cetak DATE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  status VARCHAR(20) DEFAULT 'DALAM_PROSES' CHECK (status IN ('TERBIT', 'DALAM_PROSES', 'DIBATALKAN')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- ============================================
@@ -167,16 +150,28 @@ CREATE TABLE IF NOT EXISTS raport (
 -- ============================================
 CREATE TABLE IF NOT EXISTS zoom_meetings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  judul VARCHAR(200) NOT NULL,
-  meeting_id VARCHAR(100),
-  passcode VARCHAR(50),
-  link VARCHAR(500),
-  jadwal_id UUID REFERENCES jadwal(id),
-  tgl_meeting DATE,
-  jam_mulai TIME,
-  jam_selesai TIME,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  musyrif_id UUID NOT NULL REFERENCES users(id),
+  topic VARCHAR(200) NOT NULL,
+  description TEXT,
+  meeting_date DATE NOT NULL,
+  meeting_time TIME NOT NULL,
+  duration INT NOT NULL DEFAULT 60,
+  link VARCHAR(500) NOT NULL,
+  password VARCHAR(100),
+  host_name VARCHAR(100),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- TABLE: app_settings
+-- ============================================
+CREATE TABLE IF NOT EXISTS app_settings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  key VARCHAR(100) UNIQUE NOT NULL,
+  value TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- ============================================
@@ -193,17 +188,8 @@ CREATE INDEX IF NOT EXISTS idx_jadwal_hari ON jadwal(hari);
 CREATE INDEX IF NOT EXISTS idx_target_santri ON target_hafalan(santuario_id);
 
 -- ============================================
--- TABLE: app_settings
+-- DEFAULT SETTINGS
 -- ============================================
-CREATE TABLE IF NOT EXISTS app_settings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  key VARCHAR(100) UNIQUE NOT NULL,
-  value TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Insert default settings
 INSERT INTO app_settings (key, value) VALUES
   ('appName', '"Baitul Huffaz"'),
   ('systemInfo', '"Sistem Manajemen Hafalan"'),
