@@ -37,42 +37,31 @@ export default function EvaluasiSantriPage() {
   const { user } = useAuth();
   const [evalRecord, setEvalRecord] = useState<EvaluasiRecord | null>(null);
 
-  const loadEvaluasi = () => {
+  const loadEvaluasi = async () => {
     if (!user) return;
 
-    const stored = localStorage.getItem('baitul_evaluasi_records');
-    if (stored) {
-      try {
-        const allRecords: EvaluasiRecord[] = JSON.parse(stored);
-        // Find latest record matching logged-in santri
-        const matched = allRecords.find(r => 
-          r.santriId === user.id || 
-          r.santriName.toLowerCase() === user.fullName.toLowerCase()
-        );
-        if (matched) {
-          setEvalRecord(matched);
-        }
-      } catch (e) {
-        console.error(e);
+    try {
+      const res = await fetch(`/api/evaluasi?santuario_id=${user.id}`);
+      const data = await res.json();
+      const allRecords: EvaluasiRecord[] = data.data || [];
+      const matched = allRecords.find(r => 
+        r.santriId === user.id || 
+        r.santriName.toLowerCase() === user.fullName.toLowerCase()
+      );
+      if (matched) {
+        setEvalRecord(matched);
       }
+    } catch (e) {
+      console.error(e);
     }
   };
 
   useEffect(() => {
     loadEvaluasi();
 
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'baitul_evaluasi_records') {
-        loadEvaluasi();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Interval check for updates
     const interval = setInterval(loadEvaluasi, 2000);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
     };
   }, [user]);

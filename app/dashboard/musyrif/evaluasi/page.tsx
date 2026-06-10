@@ -16,6 +16,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useSettings } from '@/lib/hooks/useSettings';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 // Interfaces
 interface Santri {
@@ -42,6 +43,7 @@ const defaultEvaluasiRecords: EvaluasiRecord[] = [];
 
 export default function EvaluasiPage() {
   const { settings } = useSettings();
+  const { user } = useAuth();
   
   // Data list states
   const [santriList, setSantriList] = useState<Santri[]>([]);
@@ -53,48 +55,43 @@ export default function EvaluasiPage() {
   const [evalKeterangan, setEvalKeterangan] = useState('');
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Load data from localStorage
-  const loadData = () => {
-    // 1. Santri
-    const storedSantri = localStorage.getItem('santri_list');
-    if (storedSantri) {
-      try {
-        const parsed = JSON.parse(storedSantri);
+  const loadData = async () => {
+    try {
+      const [santriRes, evaluasiRes] = await Promise.all([
+        fetch('/api/santri'),
+        fetch('/api/evaluasi')
+      ]);
+      if (santriRes.ok) {
+        const santriData = await santriRes.json();
+        const parsed = santriData.data || [];
         setSantriList(parsed);
         if (parsed.length > 0 && !evalSantriId) {
           setEvalSantriId(parsed[0].id);
         }
-      } catch (e) {
-        console.error(e);
+      } else {
+        setSantriList([]);
+        setEvalSantriId('');
       }
-    } else {
-      setSantriList([]);
-      setEvalSantriId('');
-    }
-
-    // 2. Evaluasi records
-    const storedRecords = localStorage.getItem('baitul_evaluasi_records');
-    if (storedRecords) {
-      try {
-        setRecords(JSON.parse(storedRecords));
-      } catch (e) {
-        console.error(e);
+      if (evaluasiRes.ok) {
+        const evaluasiData = await evaluasiRes.json();
+        const mapped = (evaluasiData.data || []).map((r: any) => ({
+          id: r.id,
+          santriId: r.santuario_id,
+          santriName: r.santri_nama || '',
+          kelasNama: r.kelas_nama || '',
+          adab: r.predikat_adab || 'Baik',
+          keterangan: r.catatan || '',
+          updatedAt: r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
+        }));
+        setRecords(mapped);
       }
-    } else {
-      setRecords([]);
+    } catch (e) {
+      console.error(e);
     }
   };
 
   useEffect(() => {
     loadData();
-
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'baitul_evaluasi_records' || e.key === 'santri_list') {
-        loadData();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const showNotification = (message: string) => {
@@ -102,36 +99,33 @@ export default function EvaluasiPage() {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleUpdateEvaluasi = (e: React.FormEvent) => {
+  const handleUpdateEvaluasi = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const selectedSantriObj = santriList.find(s => s.id === evalSantriId);
     if (!selectedSantriObj) return;
 
-    const newRecord: EvaluasiRecord = {
-      id: `eval-${Date.now()}`,
-      santriId: selectedSantriObj.id,
-      santriName: selectedSantriObj.nama_lengkap,
-      kelasNama: selectedSantriObj.kelas_nama,
-      adab: evalAdab,
-      keterangan: evalKeterangan.trim(),
-      updatedAt: new Date().toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      })
-    };
+    try {
+      const res = await fetch('/api/evaluasi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          santuario_id: selectedSantriObj.id,
+          musyrif_id: user?.id || '',
+          predikat_adab: evalAdab,
+          catatan: evalKeterangan.trim()
+        })
+      });
+      if (!res.ok) throw new Error('Failed to save');
 
-    // Filter out previous evaluations for this specific santri, then prepend the new one
-    // (This guarantees each santri has exactly one active/latest evaluation record)
-    const filteredRecords = records.filter(r => r.santriId !== selectedSantriObj.id);
-    const updatedRecords = [newRecord, ...filteredRecords];
+      await loadData();
 
-    setRecords(updatedRecords);
-    localStorage.setItem('baitul_evaluasi_records', JSON.stringify(updatedRecords));
-
-    showNotification(`Evaluasi untuk ${selectedSantriObj.nama_lengkap} berhasil disimpan!`);
-    setEvalKeterangan(''); // Clear text area
+      showNotification(`Evaluasi untuk ${selectedSantriObj.nama_lengkap} berhasil disimpan!`);
+      setEvalKeterangan(''); // Clear text area
+    } catch (e) {
+      console.error(e);
+      alert('Gagal menyimpan evaluasi');
+    }
   };
 
   return (

@@ -38,44 +38,25 @@ export default function NilaiSantriPage() {
   const { user } = useAuth();
   const [riwayat, setRiwayat] = useState<HafalanRecord[]>([]);
 
-  const loadRiwayat = () => {
+  const loadRiwayat = async () => {
     if (!user) return;
 
-    const stored = localStorage.getItem('baitul_hafalan_records');
-    if (stored) {
-      try {
-        const allRecords: HafalanRecord[] = JSON.parse(stored);
-        // Filter records matching currently logged-in santri user
-        // We match by username prefix or nis or santriId
-        const myRecords = allRecords.filter(r => 
-          r.santriId === user.id || 
-          r.nis === user.nis || 
-          r.santriName.toLowerCase() === user.fullName.toLowerCase()
-        );
-        setRiwayat(myRecords);
-      } catch (e) {
-        console.error(e);
-      }
-    } else {
-      setRiwayat([]);
+    try {
+      const res = await fetch(`/api/setoran?santuario_id=${user.id}`);
+      const data = await res.json();
+      const allRecords: HafalanRecord[] = data.data || [];
+      setRiwayat(allRecords);
+    } catch (e) {
+      console.error(e);
     }
   };
 
   useEffect(() => {
     loadRiwayat();
 
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'baitul_hafalan_records') {
-        loadRiwayat();
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    
-    // Interval check for updates
     const interval = setInterval(loadRiwayat, 2000);
 
     return () => {
-      window.removeEventListener('storage', handleStorage);
       clearInterval(interval);
     };
   }, [user]);

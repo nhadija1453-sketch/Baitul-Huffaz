@@ -9,6 +9,7 @@ import {
   FileText, Clock, BookMarked, RefreshCw
 } from 'lucide-react';
 import { useSettings } from '@/lib/hooks/useSettings';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -49,9 +50,9 @@ interface CurrentUser {
 // ─── Komponen Utama ───────────────────────────────────────────────────────────
 
 export default function SertifikatSantriPage() {
+  const { user } = useAuth();
   const { settings } = useSettings();
 
-  const [currentUser, setCurrentUser]   = useState<CurrentUser | null>(null);
   const [sertifikatList, setSertifikatList] = useState<SertifikatRecord[]>([]);
   const [isPDFLoading, setIsPDFLoading] = useState<string | null>(null);
   const [notif, setNotif]               = useState<string | null>(null);
@@ -62,35 +63,28 @@ export default function SertifikatSantriPage() {
   };
 
   // ── Load data ─────────────────────────────────────────────────────────────
-  const loadData = () => {
-    // User yang sedang login
-    const stored = localStorage.getItem('baitul_user');
-    if (stored) {
-      try { setCurrentUser(JSON.parse(stored)); } catch {}
-    }
+  const loadData = async () => {
+    if (!user) return;
 
-    // Semua sertifikat
-    const sr = localStorage.getItem('baitul_sertifikat_records');
-    if (sr) {
-      try { setSertifikatList(JSON.parse(sr)); } catch {}
+    try {
+      const res = await fetch(`/api/sertifikat?santuario_id=${user.id}`);
+      const data = await res.json();
+      setSertifikatList(data.data || []);
+    } catch (e) {
+      console.error(e);
     }
   };
 
   useEffect(() => {
     loadData();
-    const h = (e: StorageEvent) => {
-      if (e.key === 'baitul_sertifikat_records' || e.key === 'baitul_user') loadData();
-    };
-    window.addEventListener('storage', h);
-    return () => window.removeEventListener('storage', h);
-  }, []);
+  }, [user]);
 
   // ── Filter: hanya milik santri ini & sudah published ──────────────────────
   const mySertifikat = sertifikatList.filter(s =>
     s.isPublished === true &&
     (
-      (currentUser && (s.santriId === currentUser.id || s.nis === currentUser.nis)) ||
-      !currentUser // fallback: tampilkan semua jika user belum load
+      (user && (s.santriId === user.id || s.nis === user.nis)) ||
+      !user
     )
   );
 
@@ -163,13 +157,13 @@ export default function SertifikatSantriPage() {
               <div className="flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
                 <span className="text-[10px] text-tosca-500 font-extrabold uppercase tracking-wider">
-                  {settings.appName} • {currentUser?.kelas_nama || 'Santri'}
+                  {settings.appName} • {user?.fullName || 'Santri'}
                 </span>
               </div>
             </div>
           </div>
           <div className="h-9 w-9 rounded-xl bg-tosca-600 text-white flex items-center justify-center font-bold text-sm">
-            {currentUser ? currentUser.nama_lengkap.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : 'S'}
+            {user ? user.fullName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : 'S'}
           </div>
         </div>
       </header>

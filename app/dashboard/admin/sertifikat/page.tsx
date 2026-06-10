@@ -126,24 +126,31 @@ export default function ManajemenSertifikat() {
   const [fTanggal,     setFTanggal]     = useState('');
 
   // ── Load data ────────────────────────────────────────────────────────────────
-  const loadData = useCallback(() => {
-    // Santri
-    const s = localStorage.getItem('santri_list');
-    if (s) { try { setSantriList(JSON.parse(s)); } catch {} }
-    else {
-      setSantriList([]);
+  const loadData = useCallback(async () => {
+    try {
+      const [santriRes, setoranRes, sertifikatRes] = await Promise.all([
+        fetch('/api/santri'),
+        fetch('/api/setoran'),
+        fetch('/api/sertifikat'),
+      ]);
+      const santriJson = await santriRes.json();
+      if (santriJson.data) setSantriList(santriJson.data);
+      const setoranJson = await setoranRes.json();
+      if (setoranJson.data) setHafalanRecs(setoranJson.data);
+      const sertifikatJson = await sertifikatRes.json();
+      if (sertifikatJson.data) setSertifikatRecs(sertifikatJson.data);
+    } catch (err) {
+      console.error('Failed to load data', err);
     }
-    // Target
-    const t = localStorage.getItem('baitul_target_records');
+    // Target dari API
+    const targetRes = await fetch('/api/target');
+    const targetData = await targetRes.json();
+    const t = targetData.data ? JSON.stringify(targetData.data) : null;
     if (t) { try { setTargetRecords(JSON.parse(t)); } catch {} }
-    // Hafalan
-    const h = localStorage.getItem('baitul_hafalan_records');
-    if (h) { try { setHafalanRecs(JSON.parse(h)); } catch {} }
-    // Sertifikat
-    const sr = localStorage.getItem('baitul_sertifikat_records');
-    if (sr) { try { setSertifikatRecs(JSON.parse(sr)); } catch {} }
-    // Form settings
-    const fs = localStorage.getItem('baitul_sertifikat_settings');
+    // Form settings dari API
+    const settRes = await fetch('/api/settings');
+    const settData = await settRes.json();
+    const fs = settData.data ? JSON.stringify(settData.data) : null;
     if (fs) {
       try {
         const p: FormSettings = { ...DEFAULT_FORM, ...JSON.parse(fs) };
@@ -155,11 +162,6 @@ export default function ManajemenSertifikat() {
 
   useEffect(() => {
     loadData();
-    const h = (e: StorageEvent) => {
-      if (['santri_list','baitul_target_records','baitul_hafalan_records','baitul_sertifikat_records'].includes(e.key || '')) loadData();
-    };
-    window.addEventListener('storage', h);
-    return () => window.removeEventListener('storage', h);
   }, [loadData]);
 
   // ── Buka Modal ───────────────────────────────────────────────────────────────
@@ -193,13 +195,17 @@ export default function ManajemenSertifikat() {
     setIsModalOpen(true);
   };
 
-  // ── Simpan form settings ke localStorage ─────────────────────────────────────
-  const persistFormSettings = () => {
+  // ── Simpan form settings ke API ──────────────────────────────────────────────
+  const persistFormSettings = async () => {
     const p: FormSettings = {
       alamatSekolah: fAlamat, akreditasi: fAkreditasi,
       namaPenanggungJawab: fNamaTTD, jabatan: fJabatan, kotaPenandatangan: fKota,
     };
-    localStorage.setItem('baitul_sertifikat_settings', JSON.stringify(p));
+    await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(p),
+    });
   };
 
   // ── Build SertifikatRecord dari form ─────────────────────────────────────────
@@ -233,40 +239,89 @@ export default function ManajemenSertifikat() {
   };
 
   // ── Simpan Draft ──────────────────────────────────────────────────────────────
-  const handleSimpanDraft = () => {
+  const handleSimpanDraft = async () => {
     if (!modalSantri) return;
-    persistFormSettings();
+    await persistFormSettings();
     const rec = buildRecord(false);
     const filtered = sertifikatRecs.filter(r => r.santriId !== modalSantri.id);
     const updated = [rec, ...filtered];
     setSertifikatRecs(updated);
-    localStorage.setItem('baitul_sertifikat_records', JSON.stringify(updated));
+    try {
+      const res = await fetch('/api/sertifikat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records: updated }),
+      });
+      if (res.ok) {
+        setModalExisting(rec);
+        showNotif(`Draft sertifikat ${modalSantri.nama_lengkap} berhasil disimpan.`);
+        return;
+      }
+    } catch {}
+    await fetch('/api/sertifikat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ records: updated }),
+    });
     setModalExisting(rec);
     showNotif(`Draft sertifikat ${modalSantri.nama_lengkap} berhasil disimpan.`);
   };
 
   // ── Simpan & Terbitkan ────────────────────────────────────────────────────────
-  const handleTerbitkan = () => {
+  const handleTerbitkan = async () => {
     if (!modalSantri) return;
-    persistFormSettings();
+    await persistFormSettings();
     const rec = buildRecord(true);
     const filtered = sertifikatRecs.filter(r => r.santriId !== modalSantri.id);
     const updated = [rec, ...filtered];
     setSertifikatRecs(updated);
-    localStorage.setItem('baitul_sertifikat_records', JSON.stringify(updated));
+    try {
+      const res = await fetch('/api/sertifikat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records: updated }),
+      });
+      if (res.ok) {
+        setModalExisting(rec);
+        showNotif(`Sertifikat ${modalSantri.nama_lengkap} berhasil diterbitkan!`);
+        setIsModalOpen(false);
+        return;
+      }
+    } catch {}
+    await fetch('/api/sertifikat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ records: updated }),
+    });
     setModalExisting(rec);
-    showNotif(`✅ Sertifikat ${modalSantri.nama_lengkap} berhasil diterbitkan!`);
+    showNotif(`Sertifikat ${modalSantri.nama_lengkap} berhasil diterbitkan!`);
     setIsModalOpen(false);
   };
 
   // ── Cabut Publikasi ───────────────────────────────────────────────────────────
-  const handleCabutTerbit = () => {
+  const handleCabutTerbit = async () => {
     if (!modalSantri || !modalExisting) return;
     const rec = { ...modalExisting, isPublished: false };
     const filtered = sertifikatRecs.filter(r => r.santriId !== modalSantri.id);
     const updated = [rec, ...filtered];
     setSertifikatRecs(updated);
-    localStorage.setItem('baitul_sertifikat_records', JSON.stringify(updated));
+    try {
+      const res = await fetch(`/api/sertifikat/${modalSantri.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rec),
+      });
+      if (res.ok) {
+        setModalExisting(rec);
+        showNotif(`Publikasi sertifikat ${modalSantri.nama_lengkap} dicabut.`);
+        return;
+      }
+    } catch {}
+    await fetch('/api/sertifikat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ records: updated }),
+    });
     setModalExisting(rec);
     showNotif(`Publikasi sertifikat ${modalSantri.nama_lengkap} dicabut.`);
   };
@@ -274,7 +329,7 @@ export default function ManajemenSertifikat() {
   // ── Generate PDF (Download / Preview) ─────────────────────────────────────────
   const handlePDF = async (action: 'download' | 'preview') => {
     if (!modalSantri) return;
-    persistFormSettings();
+    await persistFormSettings();
     setIsPDFLoading(true);
     try {
       const [{ pdf }, { SertifikatPDF }, Reacts] = await Promise.all([

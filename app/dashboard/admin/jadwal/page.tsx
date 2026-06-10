@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '@/components/ui/sidebar';
 import Navbar from '@/components/ui/navbar';
 import { 
@@ -16,23 +16,62 @@ import {
   User
 } from 'lucide-react';
 
-const scheduleData: any[] = [];
-
 export default function ManajemenJadwal() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [selectedDay, setSelectedDay] = useState(16);
+  const [scheduleData, setScheduleData] = useState<any[]>([]);
+  const [formSesi, setFormSesi] = useState('');
+  const [formJamMulai, setFormJamMulai] = useState('');
+  const [formJamSelesai, setFormJamSelesai] = useState('');
+  const [formLokasi, setFormLokasi] = useState('');
+
+  const loadJadwal = async () => {
+    try {
+      const res = await fetch('/api/jadwal');
+      const json = await res.json();
+      if (json.data) setScheduleData(json.data);
+    } catch (err) {
+      console.error('Failed to load jadwal', err);
+    }
+  };
+
+  useEffect(() => {
+    loadJadwal();
+  }, []);
 
   const triggerToast = () => {
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handleCreateSchedule = (e: React.FormEvent) => {
+  const handleCreateSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsModalOpen(false);
-    triggerToast();
+    try {
+      const res = await fetch('/api/jadwal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sesi: formSesi,
+          jam_mulai: formJamMulai,
+          jam_selesai: formJamSelesai,
+          lokasi: formLokasi,
+          hari: `2026-05-${String(selectedDay).padStart(2, '0')}`,
+          is_active: true,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to create jadwal');
+      setIsModalOpen(false);
+      setFormSesi('');
+      setFormJamMulai('');
+      setFormJamSelesai('');
+      setFormLokasi('');
+      triggerToast();
+      await loadJadwal();
+    } catch (err) {
+      console.error('Failed to create jadwal', err);
+    }
   };
 
   return (
@@ -171,16 +210,16 @@ export default function ManajemenJadwal() {
             <form className="p-6 space-y-5" onSubmit={handleCreateSchedule}>
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-tosca-700 ml-1">Nama Kegiatan</label>
-                <input type="text" required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-medium" placeholder="Contoh: Tahfizh Sore" />
+                <input type="text" value={formSesi} onChange={e => setFormSesi(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-medium" placeholder="Contoh: Tahfizh Sore" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-tosca-700 ml-1">Jam Mulai</label>
-                  <input type="time" required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-medium" />
+                  <input type="time" value={formJamMulai} onChange={e => setFormJamMulai(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-medium" />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-tosca-700 ml-1">Jam Selesai</label>
-                  <input type="time" required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-medium" />
+                  <input type="time" value={formJamSelesai} onChange={e => setFormJamSelesai(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-medium" />
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -193,7 +232,7 @@ export default function ManajemenJadwal() {
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-tosca-700 ml-1">Lokasi</label>
-                <input type="text" required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-medium" placeholder="Nama ruangan atau gedung" />
+                <input type="text" value={formLokasi} onChange={e => setFormLokasi(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-medium" placeholder="Nama ruangan atau gedung" />
               </div>
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-3 border-2 border-tosca-50 text-tosca-600 rounded-xl font-bold hover:bg-tosca-50 transition-colors">Batal</button>

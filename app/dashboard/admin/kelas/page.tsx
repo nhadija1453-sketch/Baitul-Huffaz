@@ -1,28 +1,54 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '@/components/ui/sidebar';
 import Navbar from '@/components/ui/navbar';
 import { Plus, School, Users as UsersIcon, User as UserIcon, X, CheckCircle2 } from 'lucide-react';
 import { useSettings } from '@/lib/hooks/useSettings';
-
-const dummyKelas: any[] = [];
 
 export default function ManajemenKelas() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { settings } = useSettings();
   const [showToast, setShowToast] = useState(false);
+  const [kelasList, setKelasList] = useState<any[]>([]);
+  const [formNama, setFormNama] = useState('');
+
+  const loadKelas = async () => {
+    try {
+      const res = await fetch('/api/kelas');
+      const json = await res.json();
+      if (json.data) setKelasList(json.data);
+    } catch (err) {
+      console.error('Failed to load kelas', err);
+    }
+  };
+
+  useEffect(() => {
+    loadKelas();
+  }, []);
 
   const triggerToast = () => {
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handleCreateClass = (e: React.FormEvent) => {
+  const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsModalOpen(false);
-    triggerToast();
+    try {
+      const res = await fetch('/api/kelas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nama: formNama }),
+      });
+      if (!res.ok) throw new Error('Failed to create kelas');
+      setIsModalOpen(false);
+      setFormNama('');
+      triggerToast();
+      await loadKelas();
+    } catch (err) {
+      console.error('Failed to create kelas', err);
+    }
   };
 
   return (
@@ -57,7 +83,7 @@ export default function ManajemenKelas() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {dummyKelas.map((kelas) => (
+            {kelasList.map((kelas) => (
               <div key={kelas.id} className="bg-white rounded-3xl border border-tosca-50 shadow-sm overflow-hidden group hover:border-tosca-300 hover:shadow-xl transition-all duration-300">
                 <div className="p-6 bg-tosca-600 text-white relative overflow-hidden">
                   <div className="absolute -right-4 -bottom-4 opacity-20 group-hover:scale-110 transition-transform duration-500">
@@ -112,7 +138,7 @@ export default function ManajemenKelas() {
             <form className="p-6 space-y-5" onSubmit={handleCreateClass}>
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-tosca-700 ml-1">Nama Kelas</label>
-                <input type="text" required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-medium" placeholder="Contoh: 7B - Tahfizh Dasar" />
+                <input type="text" value={formNama} onChange={e => setFormNama(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-medium" placeholder="Contoh: 7B - Tahfizh Dasar" />
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-tosca-700 ml-1">Wali Kelas</label>

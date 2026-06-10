@@ -88,38 +88,21 @@ export default function ManajemenMusyrif() {
     password: '',
   });
 
-  // Load data dari localStorage
-  const [musyrifList, setMusyrifList] = useState<Musyrif[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('musyrif_list');
-      return stored ? JSON.parse(stored) : initialMusyrif;
-    }
-    return initialMusyrif;
-  });
+  const [musyrifList, setMusyrifList] = useState<Musyrif[]>([]);
 
-  // Simpan ke localStorage
+  const loadMusyrif = async () => {
+    try {
+      const res = await fetch('/api/musyrif');
+      const json = await res.json();
+      if (json.data) setMusyrifList(json.data);
+    } catch (err) {
+      console.error('Failed to load musyrif', err);
+    }
+  };
+
   useEffect(() => {
-    setIsMounted(true);
+    loadMusyrif();
   }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && isMounted) {
-      localStorage.setItem('musyrif_list', JSON.stringify(musyrifList));
-
-      // Sync dengan accounts untuk login
-      const accounts = [...initialAccounts];
-      const existingAccounts = localStorage.getItem('musyrif_accounts');
-      if (existingAccounts) {
-        const parsed = JSON.parse(existingAccounts);
-        parsed.forEach((acc: any) => {
-          if (!accounts.some(a => a.username === acc.username)) {
-            accounts.push(acc);
-          }
-        });
-      }
-      localStorage.setItem('musyrif_accounts', JSON.stringify(accounts));
-    }
-  }, [musyrifList, isMounted]);
 
   // Generate NIP
   const generateNIP = () => {
@@ -204,67 +187,39 @@ export default function ManajemenMusyrif() {
 
   const handleSave = async () => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
 
-    if (isEditMode && editingMusyrif) {
-      // Update existing
-      setMusyrifList(prev => prev.map(m =>
-        m.id === editingMusyrif.id
-          ? {
-              ...m,
-              ...formData,
-              kelas_nama: kelasList.find(k => k.id === formData.kelas_id)?.nama || m.kelas_nama,
-              password: formData.password ? `hashed_${formData.password}` : m.password
-            }
-          : m
-      ));
-
-      // Update account if password changed
-      if (formData.password) {
-        const stored = localStorage.getItem('musyrif_accounts');
-        if (stored) {
-          const accounts = JSON.parse(stored);
-          const index = accounts.findIndex((a: any) => a.id === editingMusyrif.id);
-          if (index >= 0) {
-            accounts[index].password = simpleHash(formData.password);
-            accounts[index].email = formData.email;
-            accounts[index].fullName = formData.nama_lengkap;
-            localStorage.setItem('musyrif_accounts', JSON.stringify(accounts));
-          }
-        }
+    try {
+      if (isEditMode && editingMusyrif) {
+        const res = await fetch(`/api/musyrif/${editingMusyrif.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            full_name: formData.nama_lengkap,
+            ...(formData.email ? { email: formData.email } : {}),
+            ...(formData.password ? { password: formData.password } : {}),
+          }),
+        });
+        if (!res.ok) throw new Error('Failed to update');
+        triggerToast('Data Musyrif Berhasil Diperbarui!');
+      } else {
+        const res = await fetch('/api/musyrif', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+            full_name: formData.nama_lengkap,
+            nip: formData.nip,
+          }),
+        });
+        if (!res.ok) throw new Error('Failed to create');
+        triggerToast(`Musyrif "${formData.nama_lengkap}" berhasil ditambahkan!`);
       }
 
-      triggerToast('Data Musyrif Berhasil Diperbarui!');
-    } else {
-      // Add new
-      const newMusyrif: Musyrif = {
-        id: Date.now().toString(),
-        ...formData,
-        kelas_nama: kelasList.find(k => k.id === formData.kelas_id)?.nama || '',
-        is_active: true,
-        created_at: new Date().toISOString().split('T')[0],
-        password: `hashed_${formData.password}`,
-      };
-      setMusyrifList(prev => [newMusyrif, ...prev]);
-
-      // Create login account
-      const newAccount = {
-        id: newMusyrif.id,
-        username: formData.username,
-        password: simpleHash(formData.password),
-        fullName: formData.nama_lengkap,
-        email: formData.email,
-        role: 'MUSYRIF',
-        nip: formData.nip,
-        created_at: new Date().toISOString(),
-      };
-
-      const stored = localStorage.getItem('musyrif_accounts');
-      const accounts = stored ? JSON.parse(stored) : [];
-      accounts.push(newAccount);
-      localStorage.setItem('musyrif_accounts', JSON.stringify(accounts));
-
-      triggerToast(`Musyrif "${formData.nama_lengkap}" berhasil ditambahkan! Akun: ${formData.username}`);
+      await loadMusyrif();
+    } catch (err) {
+      console.error('Save failed', err);
+      triggerToast('Gagal menyimpan data musyrif.');
     }
 
     setIsLoading(false);
@@ -272,19 +227,17 @@ export default function ManajemenMusyrif() {
     resetForm();
   };
 
-  const handleDelete = (id: string, nama: string) => {
+  const handleDelete = async (id: string, nama: string) => {
     if (confirm(`Apakah Anda yakin ingin menghapus data Musyrif "${nama}"?\nAkun login juga akan dihapus.`)) {
-      setMusyrifList(prev => prev.filter(m => m.id !== id));
-
-      // Delete account
-      const stored = localStorage.getItem('musyrif_accounts');
-      if (stored) {
-        const accounts = JSON.parse(stored);
-        const filtered = accounts.filter((a: any) => a.id !== id);
-        localStorage.setItem('musyrif_accounts', JSON.stringify(filtered));
+      try {
+        const res = await fetch(`/api/musyrif/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed to delete');
+        triggerToast('Data Musyrif Berhasil Dihapus!');
+        await loadMusyrif();
+      } catch (err) {
+        console.error('Delete failed', err);
+        triggerToast('Gagal menghapus data musyrif.');
       }
-
-      triggerToast('Data Musyrif Berhasil Dihapus!');
     }
   };
 

@@ -25,42 +25,31 @@ export default function TargetSantriPage() {
   const { user } = useAuth();
   const [targetRecord, setTargetRecord] = useState<TargetRecord | null>(null);
 
-  const loadTarget = () => {
+  const loadTarget = async () => {
     if (!user) return;
 
-    const stored = localStorage.getItem('baitul_target_records');
-    if (stored) {
-      try {
-        const allRecords: TargetRecord[] = JSON.parse(stored);
-        // Find latest target record matching the logged-in santri
-        const matched = allRecords.find(r => 
-          r.santriId === user.id || 
-          r.santriName.toLowerCase() === user.fullName.toLowerCase()
-        );
-        if (matched) {
-          setTargetRecord(matched);
-        }
-      } catch (e) {
-        console.error(e);
+    try {
+      const res = await fetch(`/api/target?santuario_id=${user.id}`);
+      const data = await res.json();
+      const allRecords: TargetRecord[] = data.data || [];
+      const matched = allRecords.find(r => 
+        r.santriId === user.id || 
+        r.santriName.toLowerCase() === user.fullName.toLowerCase()
+      );
+      if (matched) {
+        setTargetRecord(matched);
       }
+    } catch (e) {
+      console.error(e);
     }
   };
 
   useEffect(() => {
     loadTarget();
 
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'baitul_target_records') {
-        loadTarget();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-
-    // Interval check for real-time same-tab reactivity
     const interval = setInterval(loadTarget, 2000);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
     };
   }, [user]);

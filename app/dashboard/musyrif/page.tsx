@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   GraduationCap,
-  Sliders, BookOpen, Star, BookOpenCheck, ClipboardList, CheckSquare,
+  BookOpen, Star, BookOpenCheck, ClipboardList, CheckSquare,
   Calendar, Target, Award, Sparkles, User, Home, LogOut, ChevronRight, Clock, Smartphone,
   Video
 } from 'lucide-react';
@@ -16,20 +16,17 @@ export default function MusyrifDashboard() {
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { settings } = useSettings();
+  const [matchedMusyrif, setMatchedMusyrif] = React.useState<any>(null);
 
-  // Find additional details from musyrif_list stored in localStorage
-  let matchedMusyrif: any = null;
-  if (typeof window !== 'undefined' && user) {
-    const stored = localStorage.getItem('musyrif_list');
-    if (stored) {
-      try {
-        const musyrifList = JSON.parse(stored);
-        matchedMusyrif = musyrifList.find((m: any) => m.id === user.id || m.nip === user.nip);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }
+  React.useEffect(() => {
+    if (!user) return;
+    fetch(`/api/musyrif/${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.data) setMatchedMusyrif(data.data);
+      })
+      .catch(() => {}); // silent fail, tampilan tetap berjalan
+  }, [user]);
 
   const modules = [
     { id: 'jadwal', label: 'Jadwal', icon: Calendar, color: 'from-indigo-500 to-blue-700', href: '/dashboard/musyrif/jadwal' },

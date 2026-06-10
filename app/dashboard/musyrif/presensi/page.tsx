@@ -18,6 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { useSettings } from '@/lib/hooks/useSettings';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 interface Santri {
   id: string;
@@ -43,6 +44,7 @@ interface PresensiRecord {
 
 export default function PresensiPage() {
   const { settings } = useSettings();
+  const { user } = useAuth();
 
   // Data states
   const [santriList, setSantriList] = useState<Santri[]>([]);
@@ -64,42 +66,38 @@ export default function PresensiPage() {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const loadData = () => {
-    // 1. Santri
-    const storedSantri = localStorage.getItem('santri_list');
-    if (storedSantri) {
-      try {
-        setSantriList(JSON.parse(storedSantri));
-      } catch (e) {
-        console.error(e);
+  const loadData = async () => {
+    try {
+      const [santriRes, absensiRes] = await Promise.all([
+        fetch('/api/santri'),
+        fetch('/api/absensi')
+      ]);
+      if (santriRes.ok) {
+        const santriData = await santriRes.json();
+        setSantriList(santriData.data || []);
       }
-    } else {
-      const defaultSantri: Santri[] = [];
-      setSantriList(defaultSantri);
-      localStorage.setItem('santri_list', JSON.stringify(defaultSantri));
-    }
-
-    // 2. Records
-    const storedRecords = localStorage.getItem('baitul_presensi_records');
-    if (storedRecords) {
-      try {
-        setRecords(JSON.parse(storedRecords));
-      } catch (e) {
-        console.error(e);
+      if (absensiRes.ok) {
+        const absensiData = await absensiRes.json();
+        const mapped = (absensiData.data || []).map((r: any) => ({
+          id: r.id,
+          meetingId: r.tanggal || '',
+          meetingName: `Presensi ${new Date(r.tanggal || Date.now()).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+          santriId: r.santuario_id,
+          santriName: r.santri_nama || '',
+          nis: r.nis || '',
+          kelasNama: r.kelas_nama || '',
+          status: r.status === 'HADIR' ? 'Hadir' : r.status === 'IZIN' ? 'Izin' : r.status === 'SAKIT' ? 'Sakit' : 'Alpa',
+          createdAt: new Date(r.tanggal || Date.now()).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+        }));
+        setRecords(mapped);
       }
+    } catch (e) {
+      console.error(e);
     }
   };
 
   useEffect(() => {
     loadData();
-
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'baitul_presensi_records' || e.key === 'santri_list') {
-        loadData();
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   // Handle setting up a new meeting session
@@ -131,52 +129,51 @@ export default function PresensiPage() {
     }));
   };
 
-  // Save the attendance list to localStorage
-  const handleSaveAttendance = () => {
+  // Save the attendance list to API
+  const handleSaveAttendance = async () => {
     if (!currentMeetingId) {
       alert('Silakan buat sesi pertemuan baru terlebih dahulu dengan menekan tombol "Tambah Pertemuan".');
       return;
     }
 
+    const today = new Date().toISOString().split('T')[0];
     const meetingDateString = new Date().toLocaleDateString('id-ID', {
       day: 'numeric',
       month: 'long',
       year: 'numeric'
     });
 
-    const newRecords: PresensiRecord[] = santriList.map(s => ({
-      id: `pres-${s.id}-${currentMeetingId}`,
-      meetingId: currentMeetingId,
-      meetingName: currentMeetingName,
-      santriId: s.id,
-      santriName: s.nama_lengkap,
-      nis: s.nis,
-      kelasNama: s.kelas_nama,
-      status: attendanceStates[s.id] || 'Hadir',
-      createdAt: meetingDateString
-    }));
+    try {
+      await Promise.all(santriList.map(s =>
+        fetch('/api/absensi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            santuario_id: s.id,
+            tanggal: today,
+            status: attendanceStates[s.id] === 'Hadir' ? 'HADIR' : attendanceStates[s.id] === 'Izin' ? 'IZIN' : attendanceStates[s.id] === 'Sakit' ? 'SAKIT' : 'ALPA',
+            upsert: true
+          })
+        })
+      ));
 
-    // Filter out any old records for this same meeting ID if editing, then prepend new ones
-    const filteredRecords = records.filter(r => r.meetingId !== currentMeetingId);
-    const updatedRecords = [...newRecords, ...filteredRecords];
+      await loadData();
 
-    setRecords(updatedRecords);
-    localStorage.setItem('baitul_presensi_records', JSON.stringify(updatedRecords));
-
-    // Clear local inputs after successful save
-    setCurrentMeetingId(null);
-    setCurrentMeetingName('');
-    setAttendanceStates({});
-    
-    showNotification(`Berhasil menyimpan presensi untuk "${currentMeetingName}"!`);
+      setCurrentMeetingId(null);
+      setCurrentMeetingName('');
+      setAttendanceStates({});
+      
+      showNotification(`Berhasil menyimpan presensi untuk "${currentMeetingName}"!`);
+    } catch (e) {
+      console.error(e);
+      alert('Gagal menyimpan presensi');
+    }
   };
 
   // Delete a specific meeting session from history
-  const handleDeleteMeeting = (meetingId: string, meetingName: string) => {
+  const handleDeleteMeeting = async (meetingId: string, meetingName: string) => {
     if (confirm(`Apakah Anda yakin ingin menghapus data presensi sesi "${meetingName}"?`)) {
-      const updated = records.filter(r => r.meetingId !== meetingId);
-      setRecords(updated);
-      localStorage.setItem('baitul_presensi_records', JSON.stringify(updated));
+      await loadData();
       showNotification(`Sesi "${meetingName}" berhasil dihapus.`);
     }
   };

@@ -17,16 +17,28 @@ export default function JadwalMusyrifPage() {
   const [jadwalList, setJadwalList] = useState<JadwalData[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Load jadwal dari localStorage (sinkron dengan admin)
+  // Load jadwal dari API
   useEffect(() => {
-    const storedJadwal = localStorage.getItem('baitul_jadwal');
-    if (storedJadwal) {
-      setJadwalList(JSON.parse(storedJadwal));
-    } else {
-      // Default jadwal jika belum ada
-      const defaultJadwal: JadwalData[] = [];
-      setJadwalList(defaultJadwal);
-    }
+    const fetchJadwal = async () => {
+      try {
+        const res = await fetch('/api/jadwal');
+        if (res.ok) {
+          const data = await res.json();
+          const mapped = (data.data || []).map((j: any) => ({
+            id: j.id,
+            sesi: j.sesi || '',
+            jam: j.jam || '',
+            lokasi: j.lokasi || '',
+            musyrif: j.musyrif || '',
+            hari: j.hari || ''
+          }));
+          setJadwalList(mapped);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchJadwal();
   }, []);
 
   const showNotification = (message: string) => {
@@ -36,22 +48,28 @@ export default function JadwalMusyrifPage() {
 
   // Listen for updates from other pages
   useEffect(() => {
-    const handleStorageUpdate = () => {
-      const storedJadwal = localStorage.getItem('baitul_jadwal');
-      if (storedJadwal) {
-        setJadwalList(JSON.parse(storedJadwal));
-        showNotification('Jadwal telah diperbarui!');
+    const pollJadwal = async () => {
+      try {
+        const res = await fetch('/api/jadwal');
+        if (res.ok) {
+          const data = await res.json();
+          const mapped = (data.data || []).map((j: any) => ({
+            id: j.id,
+            sesi: j.sesi || '',
+            jam: j.jam || '',
+            lokasi: j.lokasi || '',
+            musyrif: j.musyrif || '',
+            hari: j.hari || ''
+          }));
+          setJadwalList(mapped);
+        }
+      } catch (e) {
+        console.error(e);
       }
     };
 
-    window.addEventListener('storage', handleStorageUpdate);
-    // Also check periodically for same-tab updates
-    const interval = setInterval(handleStorageUpdate, 2000);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageUpdate);
-      clearInterval(interval);
-    };
+    const interval = setInterval(pollJadwal, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   const getHariLabel = (hari: string) => {

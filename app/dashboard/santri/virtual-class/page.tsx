@@ -23,16 +23,17 @@ export default function VirtualClassSantriPage() {
   const [meetings, setMeetings] = useState<VirtualMeeting[]>([]);
   const [expandedMeetingId, setExpandedMeetingId] = useState<string | null>(null);
 
-  // Load meetings from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('baitul_virtual_meetings');
-    if (stored) {
+    const loadMeetings = async () => {
       try {
-        setMeetings(JSON.parse(stored));
+        const res = await fetch('/api/zoom-meetings');
+        const data = await res.json();
+        setMeetings(data.data || []);
       } catch (e) {
-        console.error('Error parsing meetings', e);
+        console.error('Error fetching meetings', e);
       }
-    }
+    };
+    loadMeetings();
   }, []);
 
   const toggleExpand = (id: string) => {

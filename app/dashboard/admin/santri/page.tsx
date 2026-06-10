@@ -94,44 +94,21 @@ export default function ManajemenSantri() {
     password: '',
   });
 
-  // Load data dari localStorage atau gunakan data awal
-  const [santriList, setSantriList] = useState<Santri[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('santri_list');
-      return stored ? JSON.parse(stored) : initialSantri;
-    }
-    return initialSantri;
-  });
+  const [santriList, setSantriList] = useState<Santri[]>([]);
 
-  // Check if component is mounted
-  const [isMounted, setIsMounted] = useState(false);
+  const loadSantri = async () => {
+    try {
+      const res = await fetch('/api/santri');
+      const json = await res.json();
+      if (json.data) setSantriList(json.data);
+    } catch (err) {
+      console.error('Failed to load santri', err);
+    }
+  };
+
   useEffect(() => {
-    setIsMounted(true);
+    loadSantri();
   }, []);
-
-  // Simpan ke localStorage setiap kali data berubah
-  useEffect(() => {
-    if (typeof window !== 'undefined' && isMounted) {
-      localStorage.setItem('santri_list', JSON.stringify(santriList));
-
-      // Also update the accounts list for login
-      const accounts = [...initialAccounts];
-      const existingAccounts = localStorage.getItem('santri_accounts');
-      if (existingAccounts) {
-        const parsed = JSON.parse(existingAccounts);
-        // Merge with existing accounts
-        parsed.forEach((acc: any) => {
-          if (!accounts.some(a => a.username === acc.username)) {
-            accounts.push(acc);
-          }
-        });
-      }
-      // Add new accounts from current list
-      const newAccounts = initialAccounts.filter(a => !accounts.some(acc => acc.username === a.username));
-      accounts.push(...newAccounts);
-      localStorage.setItem('santri_accounts', JSON.stringify(accounts));
-    }
-  }, [santriList, isMounted]);
 
   // Generate NISN unik
   const generateNISN = () => {
@@ -223,66 +200,40 @@ export default function ManajemenSantri() {
   const handleSave = async () => {
     setIsLoading(true);
 
-    // Simulasi penundaan
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    if (isEditMode && editingSantri) {
-      // Update existing
-      setSantriList(prev => prev.map(s =>
-        s.id === editingSantri.id
-          ? {
-              ...s,
-              ...formData,
-              kelas_nama: kelasList.find(k => k.id === formData.kelas_id)?.nama || s.kelas_nama,
-              password: formData.password ? `hashed_${formData.password}` : s.password
-            }
-          : s
-      ));
-
-      // Update account if password changed
-      if (formData.password) {
-        const stored = localStorage.getItem('santri_accounts');
-        if (stored) {
-          const accounts = JSON.parse(stored);
-          const index = accounts.findIndex((a: any) => a.id === editingSantri.id);
-          if (index >= 0) {
-            accounts[index].password = simpleHash(formData.password);
-            localStorage.setItem('santri_accounts', JSON.stringify(accounts));
-          }
-        }
+    try {
+      if (isEditMode && editingSantri) {
+        const res = await fetch(`/api/santri/${editingSantri.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            full_name: formData.nama_lengkap,
+            nis: formData.nis,
+            kelas_id: formData.kelas_id,
+            ...(formData.password ? { password: formData.password } : {}),
+          }),
+        });
+        if (!res.ok) throw new Error('Failed to update');
+        triggerToast('Data Santri Berhasil Diperbarui!');
+      } else {
+        const res = await fetch('/api/santri', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: `${formData.username}@baitulhuffaz.sch.id`,
+            password: formData.password,
+            full_name: formData.nama_lengkap,
+            nis: formData.nis,
+            kelas_id: formData.kelas_id,
+          }),
+        });
+        if (!res.ok) throw new Error('Failed to create');
+        triggerToast(`Santri "${formData.nama_lengkap}" berhasil ditambahkan!`);
       }
 
-      triggerToast('Data Santri Berhasil Diperbarui!');
-    } else {
-      // Add new
-      const newSantri: Santri = {
-        id: Date.now().toString(),
-        ...formData,
-        kelas_nama: kelasList.find(k => k.id === formData.kelas_id)?.nama || '',
-        is_active: true,
-        created_at: new Date().toISOString().split('T')[0],
-        password: `hashed_${formData.password}`,
-      };
-      setSantriList(prev => [newSantri, ...prev]);
-
-      // Create login account for the new Santri
-      const newAccount = {
-        id: newSantri.id,
-        username: formData.username,
-        password: simpleHash(formData.password),
-        fullName: formData.nama_lengkap,
-        email: `${formData.username}@baitulhuffaz.sch.id`,
-        role: 'SANTRI',
-        nis: formData.nis,
-        created_at: new Date().toISOString(),
-      };
-
-      const stored = localStorage.getItem('santri_accounts');
-      const accounts = stored ? JSON.parse(stored) : [];
-      accounts.push(newAccount);
-      localStorage.setItem('santri_accounts', JSON.stringify(accounts));
-
-      triggerToast(`Santri "${formData.nama_lengkap}" berhasil ditambahkan! Akun: ${formData.username}`);
+      await loadSantri();
+    } catch (err) {
+      console.error('Save failed', err);
+      triggerToast('Gagal menyimpan data santri.');
     }
 
     setIsLoading(false);
@@ -290,10 +241,17 @@ export default function ManajemenSantri() {
     resetForm();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus data santri ini?')) {
-      setSantriList(prev => prev.filter(s => s.id !== id));
-      triggerToast('Data Santri Berhasil Dihapus!');
+      try {
+        const res = await fetch(`/api/santri/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed to delete');
+        triggerToast('Data Santri Berhasil Dihapus!');
+        await loadSantri();
+      } catch (err) {
+        console.error('Delete failed', err);
+        triggerToast('Gagal menghapus data santri.');
+      }
     }
   };
 

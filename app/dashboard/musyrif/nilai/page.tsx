@@ -8,29 +8,33 @@ export default function NilaiPage() {
   const [santriList, setSantriList] = React.useState<any[]>([]);
 
   React.useEffect(() => {
-    const stored = localStorage.getItem('santri_list');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        const hafalanStored = localStorage.getItem('baitul_hafalan_records');
-        const hafalanRecords = hafalanStored ? JSON.parse(hafalanStored) : [];
+    // Fetch santri list
+    fetch('/api/santri')
+      .then(res => res.json())
+      .then(santriData => {
+        if (!santriData.data) return;
         
-        const mapped = parsed.map((s: any) => {
-          const myRecs = hafalanRecords.filter((r: any) => r.santriId === s.id);
-          const latest = myRecs[0] || { tajwid: 0, makhraj: 0, kelancaran: 0 };
-          return {
-            id: s.id,
-            nama: s.nama_lengkap,
-            tajwid: latest.tajwid,
-            makhraj: latest.makhraj,
-            kelancaran: latest.kelancaran
-          };
-        });
-        setSantriList(mapped);
-      } catch (e) {
-        console.error(e);
-      }
-    }
+        // Fetch setoran (hafalan records)
+        return fetch('/api/setoran')
+          .then(res => res.json())
+          .then(setoranData => {
+            const hafalanRecords = setoranData.data || [];
+            
+            const mapped = santriData.data.map((s: any) => {
+              const myRecs = hafalanRecords.filter((r: any) => r.santri_id === s.id || r.santriId === s.id);
+              const latest = myRecs[0] || { tajwid: 0, makhraj: 0, kelancaran: 0 };
+              return {
+                id: s.id,
+                nama: s.nama_lengkap,
+                tajwid: latest.tajwid ?? latest.tajwid_nilai ?? 0,
+                makhraj: latest.makhraj ?? latest.makhraj_nilai ?? 0,
+                kelancaran: latest.kelancaran ?? latest.kelancaran_nilai ?? 0
+              };
+            });
+            setSantriList(mapped);
+          });
+      })
+      .catch(e => console.error('Gagal fetch nilai musyrif:', e));
   }, []);
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-24 lg:pb-8">

@@ -8,25 +8,34 @@ export default function StatusPage() {
   const [santriList, setSantriList] = React.useState<any[]>([]);
 
   React.useEffect(() => {
-    const stored = localStorage.getItem('baitul_hafalan_records');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        const map: any = {};
-        parsed.forEach((r: any) => {
-          if (!map[r.santriId]) {
-            map[r.santriId] = {
-              id: r.santriId,
-              nama: r.santriName,
-              status: r.status === 'Lanjut' ? 'Lanjut' : 'Ulangi'
-            };
-          }
-        });
-        setSantriList(Object.values(map));
-      } catch (e) {
-        console.error(e);
-      }
-    }
+    // Fetch santri list
+    fetch('/api/santri')
+      .then(res => res.json())
+      .then(santriData => {
+        if (!santriData.data) return;
+        
+        // Fetch setoran (hafalan records) to get status
+        return fetch('/api/setoran')
+          .then(res => res.json())
+          .then(setoranData => {
+            const hafalanRecords = setoranData.data || [];
+            const map: any = {};
+            
+            hafalanRecords.forEach((r: any) => {
+              const santriId = r.santri_id || r.santriId;
+              if (santriId && !map[santriId]) {
+                const santri = santriData.data.find((s: any) => s.id === santriId);
+                map[santriId] = {
+                  id: santriId,
+                  nama: santri?.nama_lengkap || r.santriName || 'Santri',
+                  status: r.status === 'Lanjut' ? 'Lanjut' : 'Ulangi'
+                };
+              }
+            });
+            setSantriList(Object.values(map));
+          });
+      })
+      .catch(e => console.error('Gagal fetch status hafalan:', e));
   }, []);
 
   const lanjutList = santriList.filter(s => s.status === 'Lanjut');

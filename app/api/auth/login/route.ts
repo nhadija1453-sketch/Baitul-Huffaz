@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// Demo users for authentication
-const DEMO_USERS = [
-  { id: 'demo-admin-001', email: 'admin@baitulhuffaz.sch.id', password: 'admin123', fullName: 'Administrator', role: 'ADMIN' },
-  { id: 'demo-musyrif-001', email: 'musyrif@baitulhuffaz.sch.id', password: 'musyrif123', fullName: 'Ustadz Mansyur', role: 'MUSYRIF' },
-  { id: 'demo-santri-001', email: 'santri@baitulhuffaz.sch.id', password: 'santri123', fullName: 'Santri Demo', role: 'SANTRI' },
-];
+import { getUserByEmail, hashPassword } from '@/lib/services/user.service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,22 +12,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = DEMO_USERS.find(u => u.email === email && u.password === password);
+    const user = await getUserByEmail(email);
 
-    if (!user) {
+    if (!user || user.password_hash !== hashPassword(password)) {
       return NextResponse.json(
         { error: 'Email atau password salah' },
         { status: 401 }
       );
     }
 
-    // Create session token (in production, use proper JWT)
+    if (!user.is_active) {
+      return NextResponse.json(
+        { error: 'Akun telah dinonaktifkan' },
+        { status: 403 }
+      );
+    }
+
     const sessionToken = Buffer.from(JSON.stringify({
       id: user.id,
       email: user.email,
-      fullName: user.fullName,
+      fullName: user.full_name,
       role: user.role,
-      exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+      exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
     })).toString('base64');
 
     const response = NextResponse.json({
@@ -41,17 +41,16 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
-        fullName: user.fullName,
+        fullName: user.full_name,
         role: user.role,
       },
     });
 
-    // Set cookie
     response.cookies.set('baitul_session', sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: 7 * 24 * 60 * 60,
       path: '/',
     });
 

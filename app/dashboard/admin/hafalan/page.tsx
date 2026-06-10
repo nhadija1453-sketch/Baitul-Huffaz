@@ -70,49 +70,27 @@ export default function ManajemenHafalanAdminPage() {
   const [selectedKelasId, setSelectedKelasId] = useState<string>('kelas-7a');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  // Load data from localStorage
-  const loadData = () => {
-    // 1. Santri
-    const storedSantri = localStorage.getItem('santri_list');
-    if (storedSantri) {
-      try {
-        setSantriList(JSON.parse(storedSantri));
-      } catch (e) {
-        console.error('Error parsing santri_list', e);
-      }
-    } else {
-      setSantriList([]);
-    }
-
-    // 2. Hafalan records
-    const storedRecords = localStorage.getItem('baitul_hafalan_records');
-    if (storedRecords) {
-      try {
-        setRecords(JSON.parse(storedRecords));
-      } catch (e) {
-        console.error('Error parsing baitul_hafalan_records', e);
-      }
-    } else {
-      setRecords([]);
+  const loadData = async () => {
+    try {
+      const [santriRes, setoranRes] = await Promise.all([
+        fetch('/api/santri'),
+        fetch('/api/setoran'),
+      ]);
+      const santriJson = await santriRes.json();
+      if (santriJson.data) setSantriList(santriJson.data);
+      const setoranJson = await setoranRes.json();
+      if (setoranJson.data) setRecords(setoranJson.data);
+    } catch (e) {
+      console.error('Error loading data', e);
     }
   };
 
   useEffect(() => {
     loadData();
-
-    // Reactive sync
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'baitul_hafalan_records' || e.key === 'santri_list') {
-        loadData();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
     
-    // Interval check for same-tab updates
     const interval = setInterval(loadData, 2000);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
     };
   }, []);

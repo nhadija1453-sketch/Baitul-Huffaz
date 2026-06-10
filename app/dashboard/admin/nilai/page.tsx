@@ -22,24 +22,27 @@ export default function ManajemenNilai() {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [nilaiList, setNilaiList] = useState<any[]>([]);
 
-  React.useEffect(() => {
-    const stored = localStorage.getItem('baitul_hafalan_records');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        const mapped = parsed.map((r: any) => ({
-          id: r.id,
-          nama: r.santriName,
-          juz: r.surah.includes('Juz') ? r.surah.replace(/Juz\s+/i, '') : '30', // extract or fallback
-          surat: r.surah,
-          nilai: r.rata.toFixed(0),
-          status: r.rata >= 90 ? 'Mumtaz' : r.rata >= 80 ? 'Lancar' : 'Murojaah'
-        }));
-        setNilaiList(mapped);
-      } catch (e) {
-        console.error(e);
-      }
-    }
+React.useEffect(() => {
+    fetch('/api/setoran')
+      .then(res => res.json())
+      .then(data => {
+        if (data.data) {
+          const mapped = data.data.map((r: any) => ({
+            id: r.id,
+            nama: r.santri_name ?? r.santriName,
+            juz: (r.surah ?? '').includes('Juz')
+              ? (r.surah ?? '').replace(/Juz\s+/i, '')
+              : '30',
+            surat: r.surah,
+            nilai: Number(r.rata ?? 0).toFixed(0),
+            status:
+              (r.rata ?? 0) >= 90 ? 'Mumtaz' :
+              (r.rata ?? 0) >= 80 ? 'Lancar' : 'Murojaah',
+          }));
+          setNilaiList(mapped);
+        }
+      })
+      .catch(e => console.error('Gagal fetch nilai:', e));
   }, []);
 
   const openDetail = (student: any) => {

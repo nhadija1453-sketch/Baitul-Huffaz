@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useSettings } from '@/lib/hooks/useSettings';
 import { useAuth } from '@/lib/hooks/useAuth';
 import {
-  GraduationCap, Sparkles, Home, Star, ClipboardList, Target, Video, Award, User, LogOut, Calendar, CheckSquare
+  GraduationCap, Sparkles, Home, Star, ClipboardList, Target, Video, Award, User, LogOut, Calendar, CheckSquare, BookOpen
 } from 'lucide-react';
 
 const defaultProfile = {
@@ -17,6 +17,8 @@ const defaultProfile = {
 };
 
 const modules = [
+  { id: 'overview', label: 'Beranda', icon: Home, color: 'from-tosca-500 to-teal-600', href: '/dashboard/santri' },
+  { id: 'setoran', label: 'Setoran', icon: BookOpen, color: 'from-sky-500 to-blue-600', href: '/dashboard/santri/setoran' },
   { id: 'jadwal', label: 'Jadwal', icon: Calendar, color: 'from-indigo-500 to-blue-700', href: '/dashboard/santri/jadwal' },
   { id: 'nilai', label: 'Nilai', icon: Star, color: 'from-amber-400 to-orange-500', href: '/dashboard/santri/nilai' },
   { id: 'evaluasi', label: 'Evaluasi', icon: ClipboardList, color: 'from-violet-500 to-purple-600', href: '/dashboard/santri/evaluasi' },
@@ -37,11 +39,12 @@ export default function SantriDashboard() {
   useEffect(() => {
     if (!user) return;
 
-    // Load Target
-    const storedTargets = localStorage.getItem('baitul_target_records');
-    if (storedTargets) {
+    const loadData = async () => {
       try {
-        const allTargets = JSON.parse(storedTargets);
+        // Load Target
+        const targetRes = await fetch(`/api/target?santuario_id=${user.id}`);
+        const targetData = await targetRes.json();
+        const allTargets = targetData.data || [];
         const match = allTargets.find((r: any) => 
           r.santriId === user.id || 
           r.santriName.toLowerCase() === user.fullName.toLowerCase()
@@ -49,16 +52,11 @@ export default function SantriDashboard() {
         if (match) {
           setJuzTarget(`Juz ${match.juzTarget}`);
         }
-      } catch (e) {
-        console.error(e);
-      }
-    }
 
-    // Load Nilai Rata-rata
-    const storedHafalan = localStorage.getItem('baitul_hafalan_records');
-    if (storedHafalan) {
-      try {
-        const allHafalan = JSON.parse(storedHafalan);
+        // Load Nilai Rata-rata
+        const hafalanRes = await fetch(`/api/setoran?santuario_id=${user.id}`);
+        const hafalanData = await hafalanRes.json();
+        const allHafalan = hafalanData.data || [];
         const myHafalan = allHafalan.filter((r: any) => 
           r.santriId === user.id || 
           r.nis === user.nis || 
@@ -68,27 +66,24 @@ export default function SantriDashboard() {
           const sum = myHafalan.reduce((acc: number, r: any) => acc + r.rata, 0);
           setRataNilai(parseFloat((sum / myHafalan.length).toFixed(1)));
         }
-      } catch (e) {
-        console.error(e);
-      }
-    }
 
-    // Load Evaluasi Adab
-    const storedEval = localStorage.getItem('baitul_evaluasi_records');
-    if (storedEval) {
-      try {
-        const allEval = JSON.parse(storedEval);
-        const match = allEval.find((r: any) => 
+        // Load Evaluasi Adab
+        const evalRes = await fetch(`/api/evaluasi?santuario_id=${user.id}`);
+        const evalData = await evalRes.json();
+        const allEval = evalData.data || [];
+        const evalMatch = allEval.find((r: any) => 
           r.santriId === user.id || 
           r.santriName.toLowerCase() === user.fullName.toLowerCase()
         );
-        if (match) {
-          setAdabPredikat(match.adab);
+        if (evalMatch) {
+          setAdabPredikat(evalMatch.adab);
         }
       } catch (e) {
         console.error(e);
       }
-    }
+    };
+
+    loadData();
   }, [user]);
 
   // Derived user display attributes

@@ -47,42 +47,23 @@ export default function ManajemenKehadiran() {
   const [selectedKelas, setSelectedKelas] = useState<string>('Semua Kelas');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const loadData = () => {
-    // 1. Santri list
-    const storedSantri = localStorage.getItem('santri_list');
-    if (storedSantri) {
-      try {
-        setSantriList(JSON.parse(storedSantri));
-      } catch (e) {
-        console.error(e);
-      }
-    } else {
-      setSantriList([]);
-    }
-
-    // 2. Presensi Records
-    const storedRecords = localStorage.getItem('baitul_presensi_records');
-    if (storedRecords) {
-      try {
-        setPresensiRecords(JSON.parse(storedRecords));
-      } catch (e) {
-        console.error(e);
-      }
-    } else {
-      setPresensiRecords([]);
+  const loadData = async () => {
+    try {
+      const [santriRes, absensiRes] = await Promise.all([
+        fetch('/api/santri'),
+        fetch('/api/absensi'),
+      ]);
+      const santriJson = await santriRes.json();
+      if (santriJson.data) setSantriList(santriJson.data);
+      const absensiJson = await absensiRes.json();
+      if (absensiJson.data) setPresensiRecords(absensiJson.data);
+    } catch (e) {
+      console.error(e);
     }
   };
 
   useEffect(() => {
     loadData();
-
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'baitul_presensi_records' || e.key === 'santri_list') {
-        loadData();
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   // Extract unique classes dynamically

@@ -87,21 +87,20 @@ export default function SertifikatMusyrifPage() {
   };
 
   // ── Load data ─────────────────────────────────────────────────────────────
-  const loadData = () => {
-    const sr = localStorage.getItem('baitul_sertifikat_records');
-    if (sr) {
-      try { setSertifikatList(JSON.parse(sr)); } catch {}
+  const loadData = async () => {
+    try {
+      const res = await fetch('/api/sertifikat');
+      const data = await res.json();
+      if (data.data) setSertifikatList(data.data);
+    } catch (e) {
+      console.error('Gagal fetch sertifikat:', e);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
     loadData();
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'baitul_sertifikat_records') loadData();
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   // ── Download / Preview PDF ────────────────────────────────────────────────

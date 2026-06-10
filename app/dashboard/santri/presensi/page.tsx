@@ -48,25 +48,17 @@ export default function PresensiSantriPage() {
   const [myRecords, setMyRecords] = useState<PresensiRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadData = () => {
+  const loadData = async () => {
     if (!user) return;
 
-    const storedRecords = localStorage.getItem('baitul_presensi_records');
-    if (storedRecords) {
-      try {
-        const allRecords: PresensiRecord[] = JSON.parse(storedRecords);
-        // Filter hanya milik santri yang login
-        const filtered = allRecords.filter(r =>
-          r.santriId === user.id ||
-          r.nis === user.nis ||
-          r.santriName?.toLowerCase() === user.fullName?.toLowerCase()
-        );
-        // Sort terbaru dulu (berdasarkan meetingId string timestamp)
-        filtered.sort((a, b) => b.meetingId.localeCompare(a.meetingId));
-        setMyRecords(filtered);
-      } catch (e) {
-        console.error(e);
-      }
+    try {
+      const res = await fetch(`/api/absensi?santuario_id=${user.id}`);
+      const data = await res.json();
+      const allRecords: PresensiRecord[] = data.data || [];
+      allRecords.sort((a, b) => b.meetingId.localeCompare(a.meetingId));
+      setMyRecords(allRecords);
+    } catch (e) {
+      console.error(e);
     }
     setLoading(false);
   };
@@ -75,11 +67,6 @@ export default function PresensiSantriPage() {
     if (user !== undefined) {
       loadData();
     }
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'baitul_presensi_records') loadData();
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 

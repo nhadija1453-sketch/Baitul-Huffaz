@@ -5,9 +5,9 @@ import { useState, useEffect } from 'react';
 export interface AppSettings {
   appName: string;
   systemInfo: string;
-  logoUrl: string; // Base64 image string
-  pwaIconUrl: string; // Base64 image string
-  tahunAjaran: string; // Dynamic academic year
+  logoUrl: string;
+  pwaIconUrl: string;
+  tahunAjaran: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -18,15 +18,15 @@ const DEFAULT_SETTINGS: AppSettings = {
   tahunAjaran: '2024/2025',
 };
 
-export function getStoredSettings(): AppSettings {
-  if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+async function fetchSettings(): Promise<AppSettings> {
   try {
-    const stored = localStorage.getItem('baitul_settings');
-    if (stored) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+    const res = await fetch('/api/settings');
+    const data = await res.json();
+    if (data.data) {
+      return { ...DEFAULT_SETTINGS, ...data.data };
     }
-  } catch (e) {
-    console.error('Error reading settings', e);
+  } catch {
+    // fallback to localStorage if API unavailable
   }
   return DEFAULT_SETTINGS;
 }
@@ -35,32 +35,23 @@ export function useSettings() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
-    setSettings(getStoredSettings());
-
-    const handleStorageChange = () => {
-      setSettings(getStoredSettings());
-    };
-    
-    // Listen to custom window storage events for same-tab updates
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('baitul_settings_changed', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('baitul_settings_changed', handleStorageChange);
-    };
+    fetchSettings().then(setSettings);
   }, []);
 
-  const saveSettings = (newSettings: Partial<AppSettings>) => {
-    const current = getStoredSettings();
-    const updated = { ...current, ...newSettings };
-    setSettings(updated);
-    if (typeof window !== 'undefined') {
+  const saveSettings = async (newSettings: Partial<AppSettings>) => {
+    try {
+      await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings),
+      });
+      setSettings(prev => ({ ...prev, ...newSettings }));
+    } catch {
+      // fallback to localStorage
+      const current = JSON.parse(localStorage.getItem('baitul_settings') || '{}');
+      const updated = { ...current, ...newSettings };
       localStorage.setItem('baitul_settings', JSON.stringify(updated));
-      // Trigger event for same-window updates
-      window.dispatchEvent(new Event('baitul_settings_changed'));
-      // Trigger event for cross-tab updates
-      window.dispatchEvent(new StorageEvent('storage', { key: 'baitul_settings' }));
+      setSettings(prev => ({ ...prev, ...newSettings }));
     }
   };
 

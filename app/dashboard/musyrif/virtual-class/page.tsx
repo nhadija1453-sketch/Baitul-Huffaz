@@ -16,6 +16,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useSettings } from '@/lib/hooks/useSettings';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 export interface VirtualMeeting {
   id: string;
@@ -28,6 +29,7 @@ export interface VirtualMeeting {
 
 export default function VirtualClassMusyrifPage() {
   const { settings } = useSettings();
+  const { user } = useAuth();
   const [meetings, setMeetings] = useState<VirtualMeeting[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -38,37 +40,78 @@ export default function VirtualClassMusyrifPage() {
   const [youtubeLink, setYoutubeLink] = useState('');
   const [zoomLink, setZoomLink] = useState('');
 
-  // Load meetings from localStorage on mount
+  // Load meetings from API on mount
   useEffect(() => {
-    const stored = localStorage.getItem('baitul_virtual_meetings');
-    if (stored) {
+    const fetchMeetings = async () => {
       try {
-        setMeetings(JSON.parse(stored));
+        const res = await fetch('/api/zoom-meetings');
+        if (res.ok) {
+          const data = await res.json();
+          const mapped = (data.data || []).map((m: any) => {
+            let parsedDesc = { googleDriveLink: '', youtubeLink: '' };
+            if (m.description) {
+              try { parsedDesc = JSON.parse(m.description); } catch (e) { /* ignore */ }
+            }
+            return {
+              id: m.id,
+              namaPertemuan: m.topic || '',
+              googleDriveLink: parsedDesc.googleDriveLink || '',
+              youtubeLink: parsedDesc.youtubeLink || '',
+              zoomLink: m.link || '',
+              createdAt: m.meeting_date ? new Date(m.meeting_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
+            };
+          });
+          setMeetings(mapped);
+        }
       } catch (e) {
-        console.error('Error parsing meetings', e);
+        console.error('Error fetching meetings', e);
       }
-    }
+    };
+    fetchMeetings();
   }, []);
 
-  const handleCreateMeeting = (e: React.FormEvent) => {
+  const handleCreateMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const newMeeting: VirtualMeeting = {
-      id: Date.now().toString(),
-      namaPertemuan,
-      googleDriveLink,
-      youtubeLink,
-      zoomLink,
-      createdAt: new Date().toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      })
-    };
-
-    const updatedMeetings = [newMeeting, ...meetings];
-    setMeetings(updatedMeetings);
-    localStorage.setItem('baitul_virtual_meetings', JSON.stringify(updatedMeetings));
+    try {
+      const res = await fetch('/api/zoom-meetings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          musyrif_id: user?.id || '',
+          topic: namaPertemuan,
+          description: JSON.stringify({ googleDriveLink, youtubeLink }),
+          meeting_date: new Date().toISOString().split('T')[0],
+          meeting_time: new Date().toTimeString().slice(0, 5),
+          duration: 60,
+          link: zoomLink,
+          host_name: user?.fullName || ''
+        })
+      });
+      if (!res.ok) throw new Error('Failed to create meeting');
+      
+      const fetchRes = await fetch('/api/zoom-meetings');
+      if (fetchRes.ok) {
+        const fetchData = await fetchRes.json();
+        const mapped = (fetchData.data || []).map((m: any) => {
+          let parsedDesc = { googleDriveLink: '', youtubeLink: '' };
+          if (m.description) {
+            try { parsedDesc = JSON.parse(m.description); } catch (e) { /* ignore */ }
+          }
+          return {
+            id: m.id,
+            namaPertemuan: m.topic || '',
+            googleDriveLink: parsedDesc.googleDriveLink || '',
+            youtubeLink: parsedDesc.youtubeLink || '',
+            zoomLink: m.link || '',
+            createdAt: m.meeting_date ? new Date(m.meeting_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
+          };
+        });
+        setMeetings(mapped);
+      }
+    } catch (e) {
+      console.error('Error creating meeting', e);
+    }
     
     // Clear form states
     setNamaPertemuan('');
@@ -81,11 +124,14 @@ export default function VirtualClassMusyrifPage() {
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handleDeleteMeeting = (id: string) => {
+  const handleDeleteMeeting = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus pertemuan ini?')) {
-      const updatedMeetings = meetings.filter(m => m.id !== id);
-      setMeetings(updatedMeetings);
-      localStorage.setItem('baitul_virtual_meetings', JSON.stringify(updatedMeetings));
+      try {
+        await fetch(`/api/zoom-meetings/${id}`, { method: 'DELETE' });
+        setMeetings(prev => prev.filter(m => m.id !== id));
+      } catch (e) {
+        console.error('Error deleting meeting', e);
+      }
     }
   };
 

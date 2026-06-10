@@ -19,6 +19,7 @@ import {
   Clock
 } from 'lucide-react';
 import { useSettings } from '@/lib/hooks/useSettings';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ const statusConfig = {
 
 export default function TargetPage() {
   const { settings } = useSettings();
+  const { user } = useAuth();
 
   // Data states
   const [santriList, setSantriList] = useState<Santri[]>([]);
@@ -89,38 +91,39 @@ export default function TargetPage() {
 
   const [notification, setNotification] = useState<string | null>(null);
 
-  // ── Load localStorage ──────────────────────────────────────────────────────
-  const loadData = () => {
-    // 1. Santri
-    const storedSantri = localStorage.getItem('santri_list');
-    if (storedSantri) {
-      try {
-        const parsed = JSON.parse(storedSantri);
-        setSantriList(parsed);
-      } catch (e) { console.error(e); }
-    } else {
-      setSantriList([]);
-      setTargetSantriId('');
-    }
-
-    // 2. Target records
-    const storedRecords = localStorage.getItem('baitul_target_records');
-    if (storedRecords) {
-      try {
-        setRecords(JSON.parse(storedRecords));
-      } catch (e) { console.error(e); }
-    } else {
-      setRecords([]);
-    }
+  // ── Load from API ─────────────────────────────────────────────────────────
+  const loadData = async () => {
+    try {
+      const [santriRes, targetRes] = await Promise.all([
+        fetch('/api/santri'),
+        fetch('/api/target')
+      ]);
+      if (santriRes.ok) {
+        const santriData = await santriRes.json();
+        setSantriList(santriData.data || []);
+      }
+      if (targetRes.ok) {
+        const targetData = await targetRes.json();
+        const mapped = (targetData.data || []).map((r: any) => ({
+          id: r.id,
+          santriId: r.santuario_id,
+          nis: r.nis || '',
+          santriName: r.santri_nama || '',
+          kelasNama: r.kelas_nama || '',
+          juzTarget: String(r.juz || ''),
+          namaSurat: r.surah || '',
+          progres: r.progres || 0,
+          statusLulus: r.status === 'SELESAI' ? 'Lulus' : r.status === 'TERLAMBAT' ? 'Belum Lulus' : 'Proses',
+          catatan: r.catatan || '',
+          updatedAt: r.target_date ? new Date(r.target_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
+        }));
+        setRecords(mapped);
+      }
+    } catch (e) { console.error(e); }
   };
 
   useEffect(() => {
     loadData();
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'baitul_target_records' || e.key === 'santri_list') loadData();
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -148,7 +151,7 @@ export default function TargetPage() {
   };
 
   // ── Simpan / Update Target ─────────────────────────────────────────────────
-  const handleUpdateTarget = (e: React.FormEvent) => {
+  const handleUpdateTarget = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const selectedSantri = santriList.find(s => s.id === targetSantriId);
@@ -164,32 +167,51 @@ export default function TargetPage() {
       return;
     }
 
-    const newRecord: TargetRecord = {
-      id: `tar-${Date.now()}`,
-      santriId:   selectedSantri.id,
-      nis:        selectedSantri.nis,
-      santriName: selectedSantri.nama_lengkap,
-      kelasNama:  selectedSantri.kelas_nama,
-      juzTarget:  newTargetJuz,
-      namaSurat:  newNamaSurat.trim(),
-      progres:    prog,
-      statusLulus: newStatusLulus,
-      catatan:    newCatatan.trim(),
-      updatedAt: new Date().toLocaleDateString('id-ID', {
-        day: 'numeric', month: 'long', year: 'numeric'
-      }),
-    };
+    try {
+      const existing = records.find(r => r.santriId === targetSantriId);
+      const apiStatus = newStatusLulus === 'Lulus' ? 'SELESAI' : newStatusLulus === 'Belum Lulus' ? 'TERLAMBAT' : 'BELUM';
 
-    // Satu santri satu record aktif
-    const filtered = records.filter(r => r.santriId !== selectedSantri.id);
-    const updated  = [newRecord, ...filtered];
+      if (existing && existing.id) {
+        const res = await fetch(`/api/target/${existing.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            santuario_id: selectedSantri.id,
+            surah: newNamaSurat.trim(),
+            juz: parseInt(newTargetJuz) || 1,
+            progres: prog,
+            status: apiStatus,
+            catatan: newCatatan.trim(),
+            target_date: new Date().toISOString().split('T')[0]
+          })
+        });
+        if (!res.ok) throw new Error('Failed to update target');
+      } else {
+        const res = await fetch('/api/target', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            santuario_id: selectedSantri.id,
+            surah: newNamaSurat.trim(),
+            juz: parseInt(newTargetJuz) || 1,
+            progres: prog,
+            status: apiStatus,
+            catatan: newCatatan.trim(),
+            target_date: new Date().toISOString().split('T')[0]
+          })
+        });
+        if (!res.ok) throw new Error('Failed to create target');
+      }
 
-    setRecords(updated);
-    localStorage.setItem('baitul_target_records', JSON.stringify(updated));
+      await loadData();
 
-    showNotification(
-      `Target ${selectedSantri.nama_lengkap} → Juz ${newTargetJuz} (${newNamaSurat}) berhasil disimpan!`
-    );
+      showNotification(
+        `Target ${selectedSantri.nama_lengkap} → Juz ${newTargetJuz} (${newNamaSurat}) berhasil disimpan!`
+      );
+    } catch (e) {
+      console.error(e);
+      alert('Gagal menyimpan target');
+    }
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────

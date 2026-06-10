@@ -192,4 +192,24 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_jadwal_hari ON jadwal(hari);
 CREATE INDEX IF NOT EXISTS idx_target_santri ON target_hafalan(santuario_id);
 
+-- ============================================
+-- TABLE: app_settings
+-- ============================================
+CREATE TABLE IF NOT EXISTS app_settings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  key VARCHAR(100) UNIQUE NOT NULL,
+  value TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Insert default settings
+INSERT INTO app_settings (key, value) VALUES
+  ('appName', '"Baitul Huffaz"'),
+  ('systemInfo', '"Sistem Manajemen Hafalan"'),
+  ('logoUrl', '""'),
+  ('pwaIconUrl', '""'),
+  ('tahunAjaran', '"2024/2025"')
+ON CONFLICT (key) DO NOTHING;
+
 COMMIT;

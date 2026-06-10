@@ -39,67 +39,52 @@ export default function AdminDashboard() {
   });
   const [activitiesList, setActivitiesList] = useState<any[]>([]);
 
-  // Load stats from localStorage
+  // Load stats from API
   useEffect(() => {
-    const loadStats = () => {
-      // Count Santri
-      const storedSantri = localStorage.getItem('santri_list');
-      const totalSantri = storedSantri ? JSON.parse(storedSantri).length : 0;
+    const loadStats = async () => {
+      try {
+        const [santriRes, musyrifRes, kelasRes, setoranRes] = await Promise.all([
+          fetch('/api/santri'),
+          fetch('/api/musyrif'),
+          fetch('/api/kelas'),
+          fetch('/api/setoran'),
+        ]);
+        const santriJson = await santriRes.json();
+        const musyrifJson = await musyrifRes.json();
+        const kelasJson = await kelasRes.json();
+        const setoranJson = await setoranRes.json();
 
-      // Count Musyrif
-      const storedMusyrif = localStorage.getItem('musyrif_list');
-      const totalMusyrif = storedMusyrif ? JSON.parse(storedMusyrif).length : 0;
+        const totalSantri = santriJson.data ? santriJson.data.length : 0;
+        const totalMusyrif = musyrifJson.data ? musyrifJson.data.length : 0;
+        const totalKelas = kelasJson.data ? kelasJson.data.length : 0;
+        const setoranData = setoranJson.data || [];
+        const rataHafalan = `${setoranData.length} Setoran`;
 
-      // Count Kelas
-      const kelasList = [
-        { id: 'kelas-7a', nama: '7A - Tahfizh Dasar' },
-        { id: 'kelas-7b', nama: '7B - Tahfizh Dasar' },
-        { id: 'kelas-8a', nama: '8A - Tahfizh Menengah' },
-        { id: 'kelas-8b', nama: '8B - Tahfizh Menengah' },
-        { id: 'kelas-9a', nama: '9A - Tahfizh Lanjutan' },
-        { id: 'kelas-9b', nama: '9B - Tahfizh Lanjutan' },
-      ];
-      const totalKelas = kelasList.length;
+        // Populate activities
+        const mapped = setoranData.slice(0, 5).map((r: any, idx: number) => ({
+          id: r.id || idx.toString(),
+          type: 'hafalan',
+          user: 'Musyrif',
+          action: 'menilai setoran',
+          target: r.santriName || r.santri_nama || '-',
+          time: r.createdAt || 'Baru saja',
+          status: r.status === 'Lanjut' ? 'Lancar' : 'Ulang',
+          detail: `Santri ${r.santriName || r.santri_nama || '-'} menyetorkan dengan rata-rata ${(r.rata || 0).toFixed(1)}.`
+        }));
+        setActivitiesList(mapped);
 
-      // Calculate dynamic average juz or setoran
-      const storedHafalan = localStorage.getItem('baitul_hafalan_records');
-      let rataHafalan = '0 Setoran';
-      if (storedHafalan) {
-        try {
-          const parsed = JSON.parse(storedHafalan);
-          rataHafalan = `${parsed.length} Setoran`;
-
-          // Populate activities
-          const mapped = parsed.slice(0, 5).map((r: any, idx: number) => ({
-            id: r.id || idx.toString(),
-            type: 'hafalan',
-            user: 'Musyrif',
-            action: 'menilai setoran',
-            target: r.santriName,
-            time: r.createdAt || 'Baru saja',
-            status: r.status === 'Lanjut' ? 'Lancar' : 'Ulang',
-            detail: `Santri ${r.santriName} menyetorkan ${r.surah} (${r.ayat}) dengan rata-rata ${r.rata.toFixed(1)}.`
-          }));
-          setActivitiesList(mapped);
-        } catch (e) {
-          console.error(e);
-        }
-      } else {
-        setActivitiesList([]);
+        setStats({
+          totalSantri,
+          totalMusyrif,
+          totalKelas,
+          rataHafalan,
+        });
+      } catch (e) {
+        console.error(e);
       }
-
-      setStats({
-        totalSantri,
-        totalMusyrif,
-        totalKelas,
-        rataHafalan
-      });
     };
 
     loadStats();
-    // Re-check on storage changes (for cross-tab sync)
-    window.addEventListener('storage', loadStats);
-    return () => window.removeEventListener('storage', loadStats);
   }, []);
 
   const handleQuickAdd = (e: React.FormEvent) => {

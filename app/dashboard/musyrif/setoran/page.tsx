@@ -18,6 +18,7 @@ import {
   BookMarked
 } from 'lucide-react';
 import { useSettings } from '@/lib/hooks/useSettings';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 // Interfaces
 interface Santri {
@@ -49,6 +50,7 @@ interface HafalanRecord {
 
 export default function SetoranHafalanMusyrifPage() {
   const { settings } = useSettings();
+  const { user } = useAuth();
   
   // Data lists
   const [santriList, setSantriList] = useState<Santri[]>([]);
@@ -68,43 +70,43 @@ export default function SetoranHafalanMusyrifPage() {
   const [inputMakhraj, setInputMakhraj] = useState('80');
   const [inputKelancaran, setInputKelancaran] = useState('80');
 
-  // Load data from localStorage
-  const loadData = () => {
-    // 1. Santri list
-    const storedSantri = localStorage.getItem('santri_list');
-    if (storedSantri) {
-      try {
-        setSantriList(JSON.parse(storedSantri));
-      } catch (e) {
-        console.error(e);
+  const loadData = async () => {
+    try {
+      const [santriRes, setoranRes] = await Promise.all([
+        fetch('/api/santri'),
+        fetch('/api/setoran')
+      ]);
+      if (santriRes.ok) {
+        const santriData = await santriRes.json();
+        setSantriList(santriData.data || []);
       }
-    } else {
-      const defaultSantri: Santri[] = [];
-      setSantriList(defaultSantri);
-      localStorage.setItem('santri_list', JSON.stringify(defaultSantri));
-    }
-
-    // 2. Hafalan records
-    const storedRecords = localStorage.getItem('baitul_hafalan_records');
-    if (storedRecords) {
-      try {
-        setRecords(JSON.parse(storedRecords));
-      } catch (e) {
-        console.error(e);
+      if (setoranRes.ok) {
+        const setoranData = await setoranRes.json();
+        const mapped = (setoranData.data || []).map((r: any) => ({
+          id: r.id,
+          santriId: r.santuario_id,
+          santriName: r.santri_nama || '',
+          kelasId: r.kelas_id || '',
+          kelasNama: r.kelas_nama || '',
+          nis: r.nis || '',
+          surah: r.surah || '',
+          ayat: r.ayat_start ? (r.ayat_end ? `${r.ayat_start}-${r.ayat_end}` : String(r.ayat_start)) : '',
+          tajwid: r.tajwid_score || 0,
+          makhraj: r.makhraj_score || 0,
+          kelancaran: r.kelancaran_score || 0,
+          rata: r.rata_rata || 0,
+          status: r.status === 'LANJUT' ? 'Lanjut' : 'Ulang',
+          createdAt: r.created_at || new Date(r.tanggal || Date.now()).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+        }));
+        setRecords(mapped);
       }
+    } catch (e) {
+      console.error(e);
     }
   };
 
   useEffect(() => {
     loadData();
-
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'baitul_hafalan_records' || e.key === 'santri_list') {
-        loadData();
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const openAssessmentModal = (santri: Santri) => {
@@ -131,7 +133,7 @@ export default function SetoranHafalanMusyrifPage() {
     setIsModalOpen(true);
   };
 
-  const handleSaveSetoran = (e: React.FormEvent) => {
+  const handleSaveSetoran = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSantri) return;
 
@@ -146,38 +148,36 @@ export default function SetoranHafalanMusyrifPage() {
 
     const averageScore = parseFloat(((taj + makh + lancar) / 3).toFixed(1));
 
-    const newRecord: HafalanRecord = {
-      id: `rec-${Date.now()}`,
-      santriId: selectedSantri.id,
-      santriName: selectedSantri.nama_lengkap,
-      kelasId: selectedSantri.kelas_id,
-      kelasNama: selectedSantri.kelas_nama,
-      nis: selectedSantri.nis,
-      surah: inputSurah.trim(),
-      ayat: inputAyat.trim(),
-      tajwid: taj,
-      makhraj: makh,
-      kelancaran: lancar,
-      rata: averageScore,
-      status: inputStatus,
-      createdAt: new Date().toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      })
-    };
+    try {
+      const res = await fetch('/api/setoran', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          santuario_id: selectedSantri.id,
+          musyrif_id: user?.id || '',
+          surah: inputSurah.trim(),
+          ayat_start: inputAyat.includes('-') ? parseInt(inputAyat.split('-')[0]) : undefined,
+          ayat_end: inputAyat.includes('-') ? parseInt(inputAyat.split('-')[1]) : undefined,
+          tajwid_score: taj,
+          makhraj_score: makh,
+          kelancaran_score: lancar,
+          rata_rata: averageScore,
+          status: inputStatus === 'Lanjut' ? 'LANJUT' : 'ULANGI',
+          jenis: 'SABAQ'
+        })
+      });
+      if (!res.ok) throw new Error('Failed to save');
 
-    // Prepend new record to the list
-    const updatedRecords = [newRecord, ...records];
-    setRecords(updatedRecords);
-    localStorage.setItem('baitul_hafalan_records', JSON.stringify(updatedRecords));
+      await loadData();
 
-    // Show toast
-    setToastMessage(`Setoran ${selectedSantri.nama_lengkap} berhasil disimpan!`);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+      setToastMessage(`Setoran ${selectedSantri.nama_lengkap} berhasil disimpan!`);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (e) {
+      console.error(e);
+      alert('Gagal menyimpan setoran');
+    }
 
-    // Reset UI states
     setIsModalOpen(false);
     setSelectedSantri(null);
   };

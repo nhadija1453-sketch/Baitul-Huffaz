@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { GraduationCap, ArrowLeft, Calendar, CheckCircle2, Home, Star, Video, Award, User } from 'lucide-react';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 interface JadwalData {
   id: number;
@@ -14,45 +15,42 @@ interface JadwalData {
 }
 
 export default function JadwalSantriPage() {
+  const { user } = useAuth();
   const [jadwalList, setJadwalList] = useState<JadwalData[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
-
-  // Load jadwal dari localStorage (sinkron dengan admin)
-  useEffect(() => {
-    const storedJadwal = localStorage.getItem('baitul_jadwal');
-    if (storedJadwal) {
-      setJadwalList(JSON.parse(storedJadwal));
-    } else {
-      // Default jadwal jika belum ada
-      const defaultJadwal: JadwalData[] = [];
-      setJadwalList(defaultJadwal);
-    }
-  }, []);
 
   const showNotification = (message: string) => {
     setNotification(message);
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // Listen for updates from other pages (sinkron otomatis)
-  useEffect(() => {
-    const handleStorageUpdate = () => {
-      const storedJadwal = localStorage.getItem('baitul_jadwal');
-      if (storedJadwal) {
-        setJadwalList(JSON.parse(storedJadwal));
-        showNotification('Jadwal telah diperbarui!');
-      }
-    };
+  const loadJadwal = async () => {
+    if (!user) return;
 
-    window.addEventListener('storage', handleStorageUpdate);
-    // Check periodically for same-tab updates
-    const interval = setInterval(handleStorageUpdate, 2000);
+    try {
+      const santriRes = await fetch('/api/santri');
+      const santriData = await santriRes.json();
+      const santriList = santriData.data || [];
+      const match = santriList.find((s: any) => s.id === user.id || s.nis === user.nis);
+      if (!match || !match.kelas_id) return;
+
+      const res = await fetch(`/api/jadwal?kelas_id=${match.kelas_id}`);
+      const data = await res.json();
+      setJadwalList(data.data || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    loadJadwal();
+
+    const interval = setInterval(loadJadwal, 2000);
 
     return () => {
-      window.removeEventListener('storage', handleStorageUpdate);
       clearInterval(interval);
     };
-  }, []);
+  }, [user]);
 
   const getHariLabel = (hari: string) => {
     const hariLabels: Record<string, string> = {
