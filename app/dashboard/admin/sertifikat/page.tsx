@@ -134,7 +134,18 @@ export default function ManajemenSertifikat() {
         fetch('/api/sertifikat'),
       ]);
       const santriJson = await santriRes.json();
-      if (santriJson.data) setSantriList(santriJson.data);
+      if (santriJson.data) {
+        const mappedSantri = (santriJson.data || []).map((s: any) => ({
+          id: s.id,
+          nis: s.nis || '',
+          nisn: s.nisn || '',
+          nama_lengkap: s.full_name || '',
+          kelas_id: s.kelas_id || '',
+          kelas_nama: s.kelas_nama || '',
+          is_active: s.is_active,
+        }));
+        setSantriList(mappedSantri);
+      }
       const setoranJson = await setoranRes.json();
       if (setoranJson.data) setHafalanRecs(setoranJson.data);
       const sertifikatJson = await sertifikatRes.json();
@@ -399,8 +410,8 @@ export default function ManajemenSertifikat() {
   const tableData = santriList
     .filter(s => selectedKelas === 'Semua Kelas' || s.kelas_nama === selectedKelas)
     .filter(s =>
-      s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.nis.includes(searchQuery)
+      (s.nama_lengkap || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (s.nis || '').includes(searchQuery)
     )
     .map(s => {
       const target   = targetRecords.find(r => r.santriId === s.id);

@@ -56,7 +56,18 @@ export default function ManajemenKehadiran() {
         fetch('/api/kelas'),
       ]);
       const santriJson = await santriRes.json();
-      if (santriJson.data) setSantriList(santriJson.data);
+      if (santriJson.data) {
+        const mappedSantri = (santriJson.data || []).map((s: any) => ({
+          id: s.id,
+          nis: s.nis || '',
+          nisn: s.nisn || '',
+          nama_lengkap: s.full_name || '',
+          kelas_id: s.kelas_id || '',
+          kelas_nama: s.kelas_nama || '',
+          is_active: s.is_active,
+        }));
+        setSantriList(mappedSantri);
+      }
       const absensiJson = await absensiRes.json();
       if (absensiJson.data) {
         const mapped = (absensiJson.data || []).map((r: any) => ({
@@ -108,7 +119,7 @@ export default function ManajemenKehadiran() {
   // Filter rekapData based on selected class and search query
   const filteredRekap = rekapData.filter(item => {
     const matchesKelas = !selectedKelas || item.kelas_nama === selectedKelas;
-    const matchesSearch = item.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) || item.nis.includes(searchQuery);
+    const matchesSearch = (item.nama_lengkap || '').toLowerCase().includes(searchQuery.toLowerCase()) || (item.nis || '').includes(searchQuery);
     return matchesKelas && matchesSearch;
   });
 

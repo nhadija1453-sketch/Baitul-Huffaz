@@ -70,7 +70,18 @@ export default function ManajemenHafalanAdminPage() {
         fetch('/api/kelas'),
       ]);
       const santriJson = await santriRes.json();
-      if (santriJson.data) setSantriList(santriJson.data);
+      if (santriJson.data) {
+        const mappedSantri = (santriJson.data || []).map((s: any) => ({
+          id: s.id,
+          nis: s.nis || '',
+          nisn: s.nisn || '',
+          nama_lengkap: s.full_name || '',
+          kelas_id: s.kelas_id || '',
+          kelas_nama: s.kelas_nama || '',
+          is_active: s.is_active,
+        }));
+        setSantriList(mappedSantri);
+      }
       const setoranJson = await setoranRes.json();
       if (setoranJson.data) {
         const mapped = (setoranJson.data || []).map((r: any) => ({
@@ -131,8 +142,8 @@ export default function ManajemenHafalanAdminPage() {
 
   // Filter list by search term
   const filteredHafalanList = santriHafalanList.filter(item => 
-    item.santri.nama_lengkap.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.santri.nis.toLowerCase().includes(searchTerm.toLowerCase())
+    (item.santri.nama_lengkap || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (item.santri.nis || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Statistics calculation
