@@ -37,19 +37,8 @@ interface Musyrif {
   created_at: string;
 }
 
-// Daftar Kelas untuk sinkronisasi
-const kelasList = [
-  { id: 'kelas-7a', nama: '7A - Tahfizh Dasar' },
-  { id: 'kelas-7b', nama: '7B - Tahfizh Dasar' },
-  { id: 'kelas-8a', nama: '8A - Tahfizh Menengah' },
-  { id: 'kelas-8b', nama: '8B - Tahfizh Menengah' },
-  { id: 'kelas-9a', nama: '9A - Tahfizh Lanjutan' },
-  { id: 'kelas-9b', nama: '9B - Tahfizh Lanjutan' },
-];
-
 // Initial Musyrif data
 const initialMusyrif: Musyrif[] = [];
-
 // Initial accounts for login
 const initialAccounts: any[] = [];
 
@@ -81,7 +70,6 @@ export default function ManajemenMusyrif() {
   const [formData, setFormData] = useState({
     nip: '',
     nama_lengkap: '',
-    kelas_id: '',
     email: '',
     no_wa: '',
     username: '',
@@ -138,7 +126,6 @@ export default function ManajemenMusyrif() {
     setFormData({
       nip: '',
       nama_lengkap: '',
-      kelas_id: '',
       email: '',
       no_wa: '',
       username: '',
@@ -165,7 +152,6 @@ export default function ManajemenMusyrif() {
     setFormData({
       nip: musyrif.nip,
       nama_lengkap: musyrif.nama_lengkap,
-      kelas_id: musyrif.kelas_id,
       email: musyrif.email,
       no_wa: musyrif.no_wa,
       username: musyrif.username,
@@ -372,7 +358,6 @@ export default function ManajemenMusyrif() {
                     <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">No</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">NIP</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Nama Lengkap</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Kelompok Binaan</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Kontak</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Username</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-tosca-700 uppercase tracking-wider">Password</th>
@@ -386,11 +371,6 @@ export default function ManajemenMusyrif() {
                         <td className="px-4 py-3 text-sm font-medium text-tosca-500">{index + 1}</td>
                         <td className="px-4 py-3 text-sm font-medium text-tosca-800">{m.nip}</td>
                         <td className="px-4 py-3 text-sm font-bold text-tosca-900">{m.nama_lengkap}</td>
-                        <td className="px-4 py-3">
-                          <span className="px-2.5 py-1 bg-purple-100 text-purple-700 rounded-full text-[10px] font-bold">
-                            {m.kelas_nama}
-                          </span>
-                        </td>
                         <td className="px-4 py-3 space-y-1">
                           <a
                             href={`mailto:${m.email}`}
@@ -441,7 +421,7 @@ export default function ManajemenMusyrif() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={8} className="px-6 py-12 text-center text-tosca-500 font-medium italic">
+                      <td colSpan={7} className="px-6 py-12 text-center text-tosca-500 font-medium italic">
                         Tidak ada musyrif yang ditemukan dengan kata kunci "{searchTerm}"
                       </td>
                     </tr>
@@ -483,35 +463,18 @@ export default function ManajemenMusyrif() {
             </div>
 
             <form className="p-6 space-y-5 max-h-[70vh] overflow-y-auto" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
-              {/* Baris 1: NIP & Kelas */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-tosca-700 ml-1">NIP</label>
-                  <input
-                    type="text"
-                    name="nip"
-                    value={formData.nip}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm text-[#0B7D72] bg-tosca-50/50"
-                    placeholder="MSR-XXX"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-tosca-700 ml-1">Kelompok Binaan (Kelas)</label>
-                  <select
-                    name="kelas_id"
-                    value={formData.kelas_id}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm text-[#0B7D72]"
-                  >
-                    <option value="">-- Pilih Kelas --</option>
-                    {kelasList.map(k => (
-                      <option key={k.id} value={k.id}>{k.nama}</option>
-                    ))}
-                  </select>
-                </div>
+              {/* Baris 1: NIP */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-tosca-700 ml-1">NIP</label>
+                <input
+                  type="text"
+                  name="nip"
+                  value={formData.nip}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm text-[#0B7D72] bg-tosca-50/50"
+                  placeholder="MSR-XXX"
+                />
               </div>
 
               {/* Nama Lengkap */}
