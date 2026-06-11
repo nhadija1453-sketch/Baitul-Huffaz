@@ -23,6 +23,8 @@ export default function ManajemenJadwal() {
   const [selectedDay, setSelectedDay] = useState(16);
   const [scheduleData, setScheduleData] = useState<any[]>([]);
   const [formSesi, setFormSesi] = useState('');
+  const [formHari, setFormHari] = useState('');
+  const [formTanggal, setFormTanggal] = useState('');
   const [formKelasId, setFormKelasId] = useState('');
   const [formLevel, setFormLevel] = useState('');
   const [formJamMulai, setFormJamMulai] = useState('');
@@ -31,6 +33,8 @@ export default function ManajemenJadwal() {
   const [formLokasi, setFormLokasi] = useState('');
   const [kelasOptions, setKelasOptions] = useState<any[]>([]);
   const [musyrifOptions, setMusyrifOptions] = useState<any[]>([]);
+
+  const hariList = ['SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU', 'MINGGU'];
 
   const loadData = async () => {
     try {
@@ -67,10 +71,11 @@ export default function ManajemenJadwal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sesi: formSesi,
+          hari: formHari,
+          tanggal: formTanggal || null,
           jam_mulai: formJamMulai,
           jam_selesai: formJamSelesai,
           lokasi: formLokasi,
-          hari: `2026-05-${String(selectedDay).padStart(2, '0')}`,
           kelas_id: formKelasId || null,
           musyrif_id: formMusyrifId || null,
           is_active: true,
@@ -79,6 +84,8 @@ export default function ManajemenJadwal() {
       if (!res.ok) throw new Error('Failed to create jadwal');
       setIsModalOpen(false);
       setFormSesi('');
+      setFormHari('');
+      setFormTanggal('');
       setFormKelasId('');
       setFormLevel('');
       setFormJamMulai('');
@@ -231,6 +238,21 @@ export default function ManajemenJadwal() {
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-tosca-700 ml-1">Nama Kegiatan</label>
                 <input type="text" value={formSesi} onChange={e => setFormSesi(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm text-[#0B7D72] font-medium" placeholder="Contoh: Tahfizh Sore" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-tosca-700 ml-1">Hari</label>
+                  <select value={formHari} onChange={e => setFormHari(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm font-bold text-tosca-900">
+                    <option value="">-- Pilih Hari --</option>
+                    {hariList.map(h => (
+                      <option key={h} value={h}>{h.charAt(0) + h.slice(1).toLowerCase()}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-tosca-700 ml-1">Tanggal</label>
+                  <input type="date" value={formTanggal} onChange={e => setFormTanggal(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-tosca-100 focus:ring-2 focus:ring-tosca-500 text-sm text-[#0B7D72] font-medium" />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">

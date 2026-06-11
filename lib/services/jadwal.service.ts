@@ -54,18 +54,19 @@ export async function createJadwal(data: {
   jam_selesai: string;
   lokasi?: string | null;
   hari: Jadwal['hari'];
+  tanggal?: string | null;
   kelas_id?: string | null;
   musyrif_id?: string | null;
   is_active?: boolean;
 }): Promise<Jadwal> {
   const sql = `
-    INSERT INTO jadwal (sesi, jam_mulai, jam_selesai, lokasi, hari, kelas_id, musyrif_id, is_active)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    INSERT INTO jadwal (sesi, jam_mulai, jam_selesai, lokasi, hari, tanggal, kelas_id, musyrif_id, is_active)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *
   `;
   return queryOne<Jadwal>(sql, [
     data.sesi, data.jam_mulai, data.jam_selesai, data.lokasi ?? null,
-    data.hari, data.kelas_id ?? null, data.musyrif_id ?? null,
+    data.hari, data.tanggal ?? null, data.kelas_id ?? null, data.musyrif_id ?? null,
     data.is_active ?? true
   ]) as Promise<Jadwal>;
 }
